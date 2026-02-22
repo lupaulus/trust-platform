@@ -24,6 +24,7 @@ import {
   registerNamespaceMoveContext,
 } from "./namespaceMove";
 import { StateChartEditorProvider } from "./statechart/stateChartEditor";
+import { LadderEditorProvider } from "./ladder/ladderEditor";
 
 let client: LanguageClient | undefined;
 let showIecDiagnosticRefs = true;
@@ -181,6 +182,7 @@ export async function activate(context: vscode.ExtensionContext) {
   registerHmiPanel(context);
   registerLanguageModelTools(context, { getClient: () => client });
   context.subscriptions.push(StateChartEditorProvider.register(context));
+  context.subscriptions.push(LadderEditorProvider.register(context));
   registerStTestIntegration(context);
   await seedDefaultRuntimeControlEndpoint(context);
   const config = vscode.workspace.getConfiguration("trust-lsp");

@@ -2087,6 +2087,16 @@
           }
         ],
         "priority": "default"
+      },
+      {
+        "viewType": "trust-lsp.ladder.editor",
+        "displayName": "Ladder Logic Editor",
+        "selector": [
+          {
+            "filenamePattern": "*.ladder.json"
+          }
+        ],
+        "priority": "default"
       }
     ],
     "commands": [
