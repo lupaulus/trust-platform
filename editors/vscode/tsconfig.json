@@ -16,6 +16,7 @@
     "node_modules",
     ".vscode-test",
     "src/statechart/webview/**",
-    "src/blockly/webview/**"
+    "src/blockly/webview/**",
+    "src/ladder/webview/**"
   ]
 }

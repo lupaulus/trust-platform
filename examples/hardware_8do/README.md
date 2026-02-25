@@ -13,17 +13,18 @@ This backend is **NOT** tied to any specific programming language or editor. It 
 ## Supported Programs
 
 Any program that uses 8 digital outputs can use this backend:
+- **Ladder Logic programs** (`examples/ladder/*.ladder.json`)
 - **Blockly visual programs** (`examples/blockly/*.blockly.json`)
 - **UML Statechart programs** (`examples/statecharts/*.statechart.json`)
 - **Structured Text programs** (`*.st` files)
-- **Ladder Logic** (future)
 
 ## Architecture
 
 ```
 ┌─────────────────────────┐
 │   Your Program          │
-│ (Blockly/Statechart/ST) │
+│ (Ladder/Blockly/        │
+│  Statechart/ST)         │
 └───────────┬─────────────┘
             │
             │ Uses addresses: %QX0.0 - %QX0.7
@@ -90,6 +91,8 @@ cd examples/hardware_8do
 ./start.sh
 ```
 
+Use `sudo` if your EtherCAT/GPIO environment requires elevated permissions.
+
 This will:
 - Compile the ST code (if any)
 - Start the PLC runtime
@@ -98,9 +101,9 @@ This will:
 
 ### 3. Run Your Program
 
-**For Blockly/Statechart programs:**
-- Open your `.blockly.json` or `.statechart.json` file in VS Code
-- Click "Execute on Hardware" button
+**For Ladder/Blockly/Statechart programs:**
+- Open your `.ladder.json`, `.blockly.json` or `.statechart.json` file in VS Code
+- Choose hardware mode in the editor toolbar and click run
 - The visual editor will connect to the control endpoint and control I/O directly
 
 **For ST programs:**
@@ -128,19 +131,25 @@ hardware_8do/
 
 ## Example Programs Using This Backend
 
-- `examples/blockly/ethercat-snake-bidirectional.blockly.json` - Knight Rider LED pattern (Blockly)
-- `examples/blockly/simple-led-blink.blockly.json` - Simple LED blink (Blockly)
-- `examples/statecharts/ethercat-snake-bidirectional.statechart.json` - Knight Rider (Statechart)
-- `examples/statecharts/ethercat-snake.statechart.json` - LED chase (Statechart)
+### Ladder Logic
+- `examples/ladder/ethercat-snake.ladder.json` - Knight Rider LED pattern
+
+### Statecharts
+- `examples/statecharts/ethercat-snake-bidirectional.statechart.json` - Knight Rider
+- `examples/statecharts/ethercat-snake.statechart.json` - LED chase
+
+### Blockly
+- `examples/blockly/ethercat-snake-bidirectional.blockly.json` - Knight Rider
+- `examples/blockly/simple-led-blink.blockly.json` - Simple LED blink
 
 ## Control Endpoint
 
 The runtime exposes a Unix socket at `/tmp/trust-debug.sock` that allows:
-- Direct I/O manipulation (`writeIo` command)
+- Direct I/O manipulation (`writeIo`, `forceIo`, `unforceIo`)
 - Runtime inspection
 - Variable monitoring
 
-Visual editors (Blockly, Statechart) connect to this endpoint to control hardware without generating ST code.
+Visual editors (Ladder, Blockly, Statechart) connect to this endpoint to control hardware without generating ST code.
 
 ## HMI Dashboard
 
@@ -184,6 +193,7 @@ trust-lsp compile src/Main.st
 
 ## See Also
 
+- [Ladder Logic Examples](../ladder/README.md)
 - [Blockly Examples](../blockly/README.md)
 - [Statechart Examples](../statecharts/README.md)
 - [EtherCAT Setup Guide](../ethercat_ek1100_elx008_v2/README.md)

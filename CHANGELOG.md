@@ -6,7 +6,7 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 ## [Unreleased]
 
-Target release: `v0.9.15`
+Target release: `v0.9.16`
 
 ### Added
 
@@ -19,6 +19,10 @@ Target release: `v0.9.15`
   - Added editor lifecycle test coverage to verify running statechart sessions are cleaned up when a custom editor panel is disposed.
   - Added state machine engine behavior tests for awaited hardware action ordering and fail-closed guard evaluation paths.
   - Added runtime client timeout cleanup coverage to ensure request listeners are removed on timeout/error.
+- VS Code Ladder Logic editor:
+  - Added a custom editor for `.ladder.json` files with simulation/hardware execution modes and runtime I/O integration.
+  - Added ladder webview build pipeline/assets and example programs under `examples/ladder/`.
+  - Updated `examples/hardware_8do/README.md` to document ladder/blockly/statechart usage against the shared hardware backend.
 - Web IDE project selection flow:
   - Added `/api/ide/project` and `/api/ide/project/open` to query/switch active project root at runtime.
   - Added no-bundle startup support for `trust-runtime run` so `/ide` can start first and open a project folder from the browser.
@@ -281,6 +285,8 @@ Target release: `v0.9.15`
 - Blockly ST generation now preserves connected statement chains (`next`) and Blockly control-slot names (`IF0`/`DO0`), preventing dropped statements in generated programs.
 - Blockly runtime control requests now clear timeout handles on response/connection teardown to avoid stale timer leaks during long editing sessions.
 - Blockly webview CSP no longer permits inline scripts.
+- VS Code extension activation now registers both Blockly and Ladder custom editors after merge integration, preserving `.blockly.json` and `.ladder.json` editor routing.
+- Ladder webview CSP no longer permits inline scripts.
 - VS Code statechart custom editor packaging now loads the webview template from bundled extension code instead of `src/**` runtime paths excluded by `.vscodeignore`.
 - VS Code statechart editor lifecycle now stops active execution sessions when the panel closes, ensuring timers/runtime connections are cleaned up.
 - State machine engine transition execution now awaits exit/transition/entry hardware actions before completing transitions.

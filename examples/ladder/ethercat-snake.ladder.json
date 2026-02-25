@@ -1,0 +1,506 @@
+{
+  "rungs": [
+    {
+      "id": "rung_step0_set",
+      "y": 100,
+      "elements": [
+        {
+          "id": "start_trigger",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX0.0",
+          "position": { "x": 200, "y": 100 }
+        },
+        {
+          "id": "step0_not_active_yet",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX1.0",
+          "position": { "x": 350, "y": 100 }
+        },
+        {
+          "id": "set_step0",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX1.0",
+          "position": { "x": 800, "y": 100 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step0_output",
+      "y": 200,
+      "elements": [
+        {
+          "id": "step0_active",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX1.0",
+          "position": { "x": 200, "y": 200 }
+        },
+        {
+          "id": "led0_on",
+          "type": "coil",
+          "coilType": "NORMAL",
+          "variable": "%QX0.0",
+          "position": { "x": 800, "y": 200 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step1_set",
+      "y": 300,
+      "elements": [
+        {
+          "id": "step0_complete",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX1.0",
+          "position": { "x": 200, "y": 300 }
+        },
+        {
+          "id": "step1_not_active",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX2.0",
+          "position": { "x": 350, "y": 300 }
+        },
+        {
+          "id": "set_step1",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX2.0",
+          "position": { "x": 700, "y": 300 }
+        },
+        {
+          "id": "reset_step0",
+          "type": "coil",
+          "coilType": "RESET",
+          "variable": "%MX1.0",
+          "position": { "x": 900, "y": 300 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step1_output",
+      "y": 400,
+      "elements": [
+        {
+          "id": "step1_active",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX2.0",
+          "position": { "x": 200, "y": 400 }
+        },
+        {
+          "id": "led1_on",
+          "type": "coil",
+          "coilType": "NORMAL",
+          "variable": "%QX0.1",
+          "position": { "x": 800, "y": 400 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step2_set",
+      "y": 500,
+      "elements": [
+        {
+          "id": "step1_complete",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX2.0",
+          "position": { "x": 200, "y": 500 }
+        },
+        {
+          "id": "step2_not_active",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX3.0",
+          "position": { "x": 350, "y": 500 }
+        },
+        {
+          "id": "set_step2",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX3.0",
+          "position": { "x": 700, "y": 500 }
+        },
+        {
+          "id": "reset_step1",
+          "type": "coil",
+          "coilType": "RESET",
+          "variable": "%MX2.0",
+          "position": { "x": 900, "y": 500 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step2_output",
+      "y": 600,
+      "elements": [
+        {
+          "id": "step2_active",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX3.0",
+          "position": { "x": 200, "y": 600 }
+        },
+        {
+          "id": "led2_on",
+          "type": "coil",
+          "coilType": "NORMAL",
+          "variable": "%QX0.2",
+          "position": { "x": 800, "y": 600 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step3_set",
+      "y": 700,
+      "elements": [
+        {
+          "id": "step2_complete",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX3.0",
+          "position": { "x": 200, "y": 700 }
+        },
+        {
+          "id": "step3_not_active",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX4.0",
+          "position": { "x": 350, "y": 700 }
+        },
+        {
+          "id": "set_step3",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX4.0",
+          "position": { "x": 700, "y": 700 }
+        },
+        {
+          "id": "reset_step2",
+          "type": "coil",
+          "coilType": "RESET",
+          "variable": "%MX3.0",
+          "position": { "x": 900, "y": 700 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step3_output",
+      "y": 800,
+      "elements": [
+        {
+          "id": "step3_active",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX4.0",
+          "position": { "x": 200, "y": 800 }
+        },
+        {
+          "id": "led3_on",
+          "type": "coil",
+          "coilType": "NORMAL",
+          "variable": "%QX0.3",
+          "position": { "x": 800, "y": 800 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step4_set",
+      "y": 900,
+      "elements": [
+        {
+          "id": "step3_complete",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX4.0",
+          "position": { "x": 200, "y": 900 }
+        },
+        {
+          "id": "step4_not_active",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX5.0",
+          "position": { "x": 350, "y": 900 }
+        },
+        {
+          "id": "set_step4",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX5.0",
+          "position": { "x": 700, "y": 900 }
+        },
+        {
+          "id": "reset_step3",
+          "type": "coil",
+          "coilType": "RESET",
+          "variable": "%MX4.0",
+          "position": { "x": 900, "y": 900 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step4_output",
+      "y": 1000,
+      "elements": [
+        {
+          "id": "step4_active",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX5.0",
+          "position": { "x": 200, "y": 1000 }
+        },
+        {
+          "id": "led4_on",
+          "type": "coil",
+          "coilType": "NORMAL",
+          "variable": "%QX0.4",
+          "position": { "x": 800, "y": 1000 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step5_set",
+      "y": 1100,
+      "elements": [
+        {
+          "id": "step4_complete",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX5.0",
+          "position": { "x": 200, "y": 1100 }
+        },
+        {
+          "id": "step5_not_active",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX6.0",
+          "position": { "x": 350, "y": 1100 }
+        },
+        {
+          "id": "set_step5",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX6.0",
+          "position": { "x": 700, "y": 1100 }
+        },
+        {
+          "id": "reset_step4",
+          "type": "coil",
+          "coilType": "RESET",
+          "variable": "%MX5.0",
+          "position": { "x": 900, "y": 1100 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step5_output",
+      "y": 1200,
+      "elements": [
+        {
+          "id": "step5_active",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX6.0",
+          "position": { "x": 200, "y": 1200 }
+        },
+        {
+          "id": "led5_on",
+          "type": "coil",
+          "coilType": "NORMAL",
+          "variable": "%QX0.5",
+          "position": { "x": 800, "y": 1200 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step6_set",
+      "y": 1300,
+      "elements": [
+        {
+          "id": "step5_complete",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX6.0",
+          "position": { "x": 200, "y": 1300 }
+        },
+        {
+          "id": "step6_not_active",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX7.0",
+          "position": { "x": 350, "y": 1300 }
+        },
+        {
+          "id": "set_step6",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX7.0",
+          "position": { "x": 700, "y": 1300 }
+        },
+        {
+          "id": "reset_step5",
+          "type": "coil",
+          "coilType": "RESET",
+          "variable": "%MX6.0",
+          "position": { "x": 900, "y": 1300 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step6_output",
+      "y": 1400,
+      "elements": [
+        {
+          "id": "step6_active",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX7.0",
+          "position": { "x": 200, "y": 1400 }
+        },
+        {
+          "id": "led6_on",
+          "type": "coil",
+          "coilType": "NORMAL",
+          "variable": "%QX0.6",
+          "position": { "x": 800, "y": 1400 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step7_set",
+      "y": 1500,
+      "elements": [
+        {
+          "id": "step6_complete",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX7.0",
+          "position": { "x": 200, "y": 1500 }
+        },
+        {
+          "id": "step7_not_active",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX8.0",
+          "position": { "x": 350, "y": 1500 }
+        },
+        {
+          "id": "set_step7",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX8.0",
+          "position": { "x": 700, "y": 1500 }
+        },
+        {
+          "id": "reset_step6",
+          "type": "coil",
+          "coilType": "RESET",
+          "variable": "%MX7.0",
+          "position": { "x": 900, "y": 1500 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_step7_output",
+      "y": 1600,
+      "elements": [
+        {
+          "id": "step7_active",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX8.0",
+          "position": { "x": 200, "y": 1600 }
+        },
+        {
+          "id": "led7_on",
+          "type": "coil",
+          "coilType": "NORMAL",
+          "variable": "%QX0.7",
+          "position": { "x": 800, "y": 1600 }
+        }
+      ],
+      "connections": []
+    },
+    {
+      "id": "rung_restart",
+      "y": 1700,
+      "elements": [
+        {
+          "id": "step7_done2",
+          "type": "contact",
+          "contactType": "NO",
+          "variable": "%MX8.0",
+          "position": { "x": 200, "y": 1700 }
+        },
+        {
+          "id": "step0_not_active",
+          "type": "contact",
+          "contactType": "NC",
+          "variable": "%MX1.0",
+          "position": { "x": 350, "y": 1700 }
+        },
+        {
+          "id": "restart_step0",
+          "type": "coil",
+          "coilType": "SET",
+          "variable": "%MX1.0",
+          "position": { "x": 700, "y": 1700 }
+        },
+        {
+          "id": "reset_step7",
+          "type": "coil",
+          "coilType": "RESET",
+          "variable": "%MX8.0",
+          "position": { "x": 900, "y": 1700 }
+        }
+      ],
+      "connections": []
+    }
+  ],
+  "variables": [
+    { "name": "%MX0.0", "type": "BOOL", "address": "%MX0.0", "comment": "Start trigger" },
+    { "name": "%MX1.0", "type": "BOOL", "address": "%MX1.0", "comment": "Step 0 active" },
+    { "name": "%MX2.0", "type": "BOOL", "address": "%MX2.0", "comment": "Step 1 active" },
+    { "name": "%MX3.0", "type": "BOOL", "address": "%MX3.0", "comment": "Step 2 active" },
+    { "name": "%MX4.0", "type": "BOOL", "address": "%MX4.0", "comment": "Step 3 active" },
+    { "name": "%MX5.0", "type": "BOOL", "address": "%MX5.0", "comment": "Step 4 active" },
+    { "name": "%MX6.0", "type": "BOOL", "address": "%MX6.0", "comment": "Step 5 active" },
+    { "name": "%MX7.0", "type": "BOOL", "address": "%MX7.0", "comment": "Step 6 active" },
+    { "name": "%MX8.0", "type": "BOOL", "address": "%MX8.0", "comment": "Step 7 active" },
+    { "name": "%QX0.0", "type": "BOOL", "address": "%QX0.0", "comment": "EL2008 LED 0" },
+    { "name": "%QX0.1", "type": "BOOL", "address": "%QX0.1", "comment": "EL2008 LED 1" },
+    { "name": "%QX0.2", "type": "BOOL", "address": "%QX0.2", "comment": "EL2008 LED 2" },
+    { "name": "%QX0.3", "type": "BOOL", "address": "%QX0.3", "comment": "EL2008 LED 3" },
+    { "name": "%QX0.4", "type": "BOOL", "address": "%QX0.4", "comment": "EL2008 LED 4" },
+    { "name": "%QX0.5", "type": "BOOL", "address": "%QX0.5", "comment": "EL2008 LED 5" },
+    { "name": "%QX0.6", "type": "BOOL", "address": "%QX0.6", "comment": "EL2008 LED 6" },
+    { "name": "%QX0.7", "type": "BOOL", "address": "%QX0.7", "comment": "EL2008 LED 7" }
+  ],
+  "metadata": {
+    "name": "ethercat-snake",
+    "description": "Snake/Rider effect for EL2008 - Sequential state machine that lights LEDs 0→7 in order, then restarts. Uses SET/RESET coils for state control.",
+    "hardware": "Beckhoff EL2008 (8-channel digital output)",
+    "pattern": "0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → restart",
+    "note": "Requires ladder interpreter with scan cycle to execute the sequential logic"
+  }
+}
