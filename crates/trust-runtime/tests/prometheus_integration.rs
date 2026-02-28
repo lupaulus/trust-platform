@@ -24,6 +24,7 @@ use trust_runtime::web::start_web_server;
 
 fn runtime_settings() -> RuntimeSettings {
     RuntimeSettings::new(
+        trust_runtime::value::Duration::from_millis(10),
         BaseSettings {
             log_level: SmolStr::new("info"),
             watchdog: WatchdogPolicy::default(),
@@ -42,14 +43,19 @@ fn runtime_settings() -> RuntimeSettings {
             service_name: SmolStr::new("truST"),
             advertise: false,
             interfaces: Vec::new(),
+            host_group: None,
         },
         MeshSettings {
             enabled: false,
+            role: trust_runtime::config::MeshRole::Peer,
             listen: SmolStr::new("127.0.0.1:0"),
+            connect: Vec::new(),
             tls: false,
             auth_token: None,
             publish: Vec::new(),
             subscribe: IndexMap::new(),
+            zenohd_version: SmolStr::new("1.7.2"),
+            plugin_versions: IndexMap::new(),
         },
         SimulationSettings {
             enabled: false,
@@ -192,11 +198,11 @@ fn prometheus_endpoint_exposes_runtime_and_historian_metrics() {
     let state = control_state("PROGRAM Main\nEND_PROGRAM\n", None, Some(historian));
     let base = start_test_server(state, WebAuthMode::Local);
 
-    let response = ureq::get(&format!("{base}/metrics"))
+    let mut response = ureq::get(&format!("{base}/metrics"))
         .call()
         .expect("metrics response");
     assert_eq!(response.status(), 200);
-    let body = response.into_string().expect("metrics body");
+    let body = response.body_mut().read_to_string().expect("metrics body");
     assert!(body.contains("trust_runtime_uptime_ms"));
     assert!(body.contains("trust_runtime_cycle_last_ms"));
     assert!(body.contains("trust_runtime_historian_samples_total"));
@@ -212,15 +218,16 @@ fn prometheus_endpoint_requires_auth_when_token_mode_enabled() {
     );
     let base = start_test_server(state, WebAuthMode::Token);
 
-    let unauthorized = ureq::get(&format!("{base}/metrics")).call();
-    match unauthorized {
-        Ok(response) => panic!("expected 401, got {}", response.status()),
-        Err(ureq::Error::Status(status, _)) => assert_eq!(status, 401),
-        Err(err) => panic!("request failed: {err}"),
-    }
+    let unauthorized = ureq::get(&format!("{base}/metrics"))
+        .config()
+        .http_status_as_error(false)
+        .build()
+        .call()
+        .expect("unauthorized metrics request");
+    assert_eq!(unauthorized.status(), 401);
 
     let authorized = ureq::get(&format!("{base}/metrics"))
-        .set("X-Trust-Token", "secret")
+        .header("X-Trust-Token", "secret")
         .call()
         .expect("authorized metrics");
     assert_eq!(authorized.status(), 200);

@@ -482,9 +482,9 @@ function Ce(s) {
   return s < 65536 ? 1 : 2;
 }
 const rs = /\r\n?|\n/;
-var ht = /* @__PURE__ */ function(s) {
+var ht = /* @__PURE__ */ (function(s) {
   return s[s.Simple = 0] = "Simple", s[s.TrackDel = 1] = "TrackDel", s[s.TrackBefore = 2] = "TrackBefore", s[s.TrackAfter = 3] = "TrackAfter", s;
-}(ht || (ht = {}));
+})(ht || (ht = {}));
 class Kt {
   // Sections are encoded as pairs of integers. The first is the
   // length in the current document, and the second is -1 for
@@ -1237,7 +1237,7 @@ class Ui {
     var e;
     let i = this.value, n = this.facet.compareInput, r = this.id, o = t[r] >> 1, l = this.type == 2, a = !1, h = !1, f = [];
     for (let c of this.dependencies)
-      c == "doc" ? a = !0 : c == "selection" ? h = !0 : ((e = t[c.id]) !== null && e !== void 0 ? e : 1) & 1 || f.push(t[c.id]);
+      c == "doc" ? a = !0 : c == "selection" ? h = !0 : (((e = t[c.id]) !== null && e !== void 0 ? e : 1) & 1) == 0 && f.push(t[c.id]);
     return {
       create(c) {
         return c.values[o] = i(c), 1;
@@ -1771,9 +1771,9 @@ const bh = [];
 function De(s) {
   return s == null ? bh : Array.isArray(s) ? s : [s];
 }
-var Ut = /* @__PURE__ */ function(s) {
+var Ut = /* @__PURE__ */ (function(s) {
   return s[s.Word = 0] = "Word", s[s.Space = 1] = "Space", s[s.Other = 2] = "Other", s;
-}(Ut || (Ut = {}));
+})(Ut || (Ut = {}));
 const wh = /[\u00df\u0587\u0590-\u05f4\u0600-\u06ff\u3040-\u309f\u30a0-\u30ff\u3400-\u4db5\u4e00-\u9fcc\uac00-\ud7af]/;
 let us;
 try {
@@ -2674,7 +2674,7 @@ function Sh(s, t, e, i) {
   }
   return s.length;
 }
-const gs = "ͼ", Dr = typeof Symbol > "u" ? "__" + gs : Symbol.for(gs), ys = typeof Symbol > "u" ? "__styleSet" + Math.floor(Math.random() * 1e8) : Symbol("styleSet"), Br = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : {};
+const gs = "ͼ", Dr = typeof Symbol > "u" ? "__" + gs : Symbol.for(gs), ys = typeof Symbol > "u" ? "__styleSet" + Math.floor(Math.random() * 1e8) : /* @__PURE__ */ Symbol("styleSet"), Br = typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : {};
 class Ie {
   // :: (Object<Style>, ?{finish: ?(string) → string})
   // Create a style module from the given spec.
@@ -3041,9 +3041,9 @@ class mi {
   destroy(t) {
   }
 }
-var ut = /* @__PURE__ */ function(s) {
+var ut = /* @__PURE__ */ (function(s) {
   return s[s.Text = 0] = "Text", s[s.WidgetBefore = 1] = "WidgetBefore", s[s.WidgetAfter = 2] = "WidgetAfter", s[s.WidgetRange = 3] = "WidgetRange", s;
-}(ut || (ut = {}));
+})(ut || (ut = {}));
 class U extends se {
   constructor(t, e, i, n) {
     super(), this.startSide = t, this.endSide = e, this.widget = i, this.spec = n;
@@ -3458,9 +3458,9 @@ class Mt {
     return new Mt(t.parentNode, oe(t) + 1, e);
   }
 }
-var K = /* @__PURE__ */ function(s) {
+var K = /* @__PURE__ */ (function(s) {
   return s[s.LTR = 0] = "LTR", s[s.RTL = 1] = "RTL", s;
-}(K || (K = {}));
+})(K || (K = {}));
 const ve = K.LTR, Qs = K.RTL;
 function yl(s) {
   let t = [];
@@ -6369,9 +6369,9 @@ class At {
     return new At(this.from, this.length + t.length, this.top, this.height + t.height, e);
   }
 }
-var F = /* @__PURE__ */ function(s) {
+var F = /* @__PURE__ */ (function(s) {
   return s[s.ByPos = 0] = "ByPos", s[s.ByHeight = 1] = "ByHeight", s[s.ByPosNoHeight = 2] = "ByPosNoHeight", s;
-}(F || (F = {}));
+})(F || (F = {}));
 const Gi = 1e-3;
 class lt {
   constructor(t, e, i = 2) {
@@ -8910,7 +8910,7 @@ const xc = /* @__PURE__ */ O.baseTheme({
   },
   ".cm-tooltip-arrow": {
     height: "7px",
-    width: `${7 * 2}px`,
+    width: "14px",
     position: "absolute",
     zIndex: -1,
     overflow: "hidden",

@@ -124,3 +124,91 @@ fn stdlib_named_args() {
     harness.cycle();
     harness.assert_eq("out", 7i16);
 }
+
+#[test]
+fn function_in_out_with_conversion_expression_regression_issue_13() {
+    let source = r#"
+        FUNCTION incer2 : VOID
+        VAR_IN_OUT
+            i : USINT;
+        END_VAR
+        VAR_INPUT
+            inc : USINT;
+            dec : UINT;
+        END_VAR
+        i := i + inc - uint_to_usint(dec);
+        END_FUNCTION
+
+        PROGRAM Main
+        VAR
+            i : USINT := 100;
+            j : UINT := 100;
+            countDown : BOOL := FALSE;
+        END_VAR
+
+        IF i > 200 THEN
+            countDown := TRUE;
+        ELSIF i < 10 THEN
+            countDown := FALSE;
+        END_IF
+
+        j := usint_to_uint(i);
+        i := uint_to_usint(j);
+
+        IF countDown THEN
+            incer2(i, 0, 4);
+        ELSE
+            incer2(i, 4, 0);
+        END_IF
+        END_PROGRAM
+    "#;
+
+    let mut harness = TestHarness::from_source(source).unwrap();
+    let cycle = harness.cycle();
+    assert!(
+        cycle.errors.is_empty(),
+        "unexpected runtime errors: {:?}",
+        cycle.errors
+    );
+    harness.assert_eq("i", 104u8);
+    harness.assert_eq("j", 100u16);
+    harness.assert_eq("countDown", false);
+}
+
+#[test]
+fn function_in_out_without_conversion_expression_baseline() {
+    let source = r#"
+        FUNCTION incer : VOID
+        VAR_IN_OUT
+            i : USINT;
+        END_VAR
+        VAR_INPUT
+            inc : USINT;
+            dec : USINT;
+        END_VAR
+        i := i + inc - dec;
+        END_FUNCTION
+
+        PROGRAM Main
+        VAR
+            i : USINT := 100;
+            countDown : BOOL := FALSE;
+        END_VAR
+
+        IF countDown THEN
+            incer(i, 0, 4);
+        ELSE
+            incer(i, 4, 0);
+        END_IF
+        END_PROGRAM
+    "#;
+
+    let mut harness = TestHarness::from_source(source).unwrap();
+    let cycle = harness.cycle();
+    assert!(
+        cycle.errors.is_empty(),
+        "unexpected runtime errors: {:?}",
+        cycle.errors
+    );
+    harness.assert_eq("i", 104u8);
+}

@@ -119,12 +119,7 @@ pub(super) fn ranges_overlap(a: TextRange, b: TextRange) -> bool {
 }
 
 pub(super) fn text_for_range(source: &str, range: TextRange) -> String {
-    let start: usize = range.start().into();
-    let end: usize = range.end().into();
-    source
-        .get(start..end)
-        .map(|text| text.trim().to_string())
-        .unwrap_or_default()
+    crate::text_range::text_for_range(source, range)
 }
 
 pub(super) fn qualified_name_parts(node: &SyntaxNode) -> Vec<SmolStr> {

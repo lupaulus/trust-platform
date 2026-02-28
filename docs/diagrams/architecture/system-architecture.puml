@@ -15,14 +15,10 @@ package "VS Code Extension" as vscode #LightBlue {
     component "extension.ts" as extMain <<main entry>>
     component "STLanguageClient" as langClient
     component "DebugAdapterFactory" as debugFactory
-    component "Runtime Panel\n(Webview)" as runtimePanel <<ioPanel.ts>>
-    component "Visual Editors\n(ladder/blockly/statechart)" as visualEditors
-    component "Visual Companion Sync\n(*.json -> *.st)" as visualCompanion
+    component "Runtime Panel\n(Webview)" as runtimePanel <<ioPanel.ts + io-panel/*>>
 
     extMain --> langClient : creates
     extMain --> debugFactory : registers
-    extMain --> visualEditors : registers (priority: option)
-    extMain --> visualCompanion : registers + commands
 }
 
 note right of runtimePanel
@@ -32,25 +28,17 @@ note right of runtimePanel
     override runtime control endpoints.
 end note
 
-note right of visualCompanion
-    Visual sources stay optional.
-    Save/create/import updates
-    deterministic sibling `.st`
-    companions for text-first runtime
-    and mixed-language projects.
-end note
-
 ' ============================================================
 ' truST LSP CRATE (Protocol Layer)
 ' ============================================================
 package "trust-lsp crate" as trustlsp #LightGreen {
-    component "StLanguageServer" as server <<main.rs:16>>
-    component "ServerState" as state <<state.rs:40-48>>
+    component "StLanguageServer" as server <<main.rs>>
+    component "ServerState" as state <<state.rs>>
 
     package "handlers/" as handlers {
         component "sync.rs" as syncHandler <<did_open, did_change>>
-        component "features.rs" as featureHandler
-        component "diagnostics.rs" as diagHandler
+        component "features/mod.rs\n(core facade + core_impl/* request modules)" as featureHandler
+        component "diagnostics.rs + diagnostics/*" as diagHandler
     }
 
     server --> state : uses
@@ -68,8 +56,8 @@ end note
 ' truST IDE CRATE (IDE Features)
 ' ============================================================
 package "trust-ide crate" as stide #Wheat {
-    component "completion.rs" as completion <<complete()>>
-    component "hover.rs" as hover <<hover()>>
+    component "completion.rs + completion/*" as completion <<complete()>>
+    component "hover.rs + hover/*" as hover <<hover()>>
     component "goto_def.rs" as gotoDef <<goto_definition()>>
     component "references.rs" as refs <<find_references()>>
     component "rename.rs" as rename <<rename()>>
@@ -89,20 +77,20 @@ end note
 package "trust-hir crate" as sthir #LightCoral {
     component "Project" as project <<project.rs>>
     component "SourceRegistry" as sourceRegistry <<project.rs>>
-    component "Database" as db <<db/queries.rs:46>>
-    component "SymbolTable" as symTable <<symbols/table.rs:9-32>>
-    component "SymbolCollector" as collector <<db/queries/collector/mod.rs:12-20>>
+    component "Database" as db <<db/queries.rs>>
+    component "SymbolTable" as symTable <<symbols/table.rs>>
+    component "SymbolCollector" as collector <<db/queries/collector/mod.rs>>
     component "TypeChecker" as typeCheck <<type_check/mod.rs>>
 
     package "types/" as types {
-        component "TypeId" as typeId <<types/defs.rs:8>>
+        component "TypeId" as typeId <<types/defs.rs>>
         component "Type" as typeEnum
         component "TypeRegistry" as typeReg
     }
 
     package "symbols/" as symbols {
         component "Symbol" as symbol
-        component "SymbolKind" as symKind <<symbols/defs.rs:60-112>>
+        component "SymbolKind" as symKind <<symbols/defs.rs>>
         component "ScopeId" as scopeId
     }
 
@@ -162,6 +150,7 @@ package "trust-runtime crate" as struntime #LightYellow {
     component "Watchdog" as watchdog
     component "Control Server\n(IPC)" as controlServer
     component "Web UI Server\n(HTTP/HTTPS)" as webServer
+    component "Web UI Bundles\n(/modules/*.js by concern)" as webUiBundles
     component "Web IDE State\n(Session + Versioning)" as webIde
     component "Discovery\n(mDNS)" as discovery
     component "Mesh Sync\n(Peer Data, TCP/TLS)" as meshSync
@@ -182,7 +171,7 @@ package "trust-runtime crate" as struntime #LightYellow {
     }
 
     package "debug/" as debug {
-        component "DebugControl" as debugCtrl <<debug/control.rs>>
+        component "DebugControl" as debugCtrl <<debug/control/api.rs + debug/control/hook.rs>>
         component "DebugHook" as debugHook <<debug/hook.rs>>
     }
 
@@ -217,6 +206,7 @@ package "trust-runtime crate" as struntime #LightYellow {
     controlServer --> historianSvc : historian.query/alerts
     runtime --> retainMgr : retain lifecycle
     webServer --> controlServer : status/control
+    webServer --> webUiBundles : serves
     webServer --> promScrape : GET /metrics
     promScrape --> historianSvc : scrape data
     promScrape --> runtime : metrics snapshot
@@ -230,7 +220,7 @@ package "trust-runtime crate" as struntime #LightYellow {
 ' ============================================================
 package "trust-debug crate" as stdebug #Lavender {
     component "DebugAdapter" as adapter <<adapter/mod.rs>>
-    component "DebugSession" as session <<session.rs:68>>
+    component "DebugSession" as session <<session.rs + session/*>>
     component "Protocol IO" as protocolIo
 
     adapter --> session

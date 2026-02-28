@@ -5,11 +5,15 @@
 use indexmap::IndexMap;
 use smol_str::SmolStr;
 
+use crate::config::{
+    MeshRole, RuntimeCloudLinkPreferenceRule, RuntimeCloudProfile, RuntimeCloudWanAllowRule,
+};
 use crate::value::Duration;
 use crate::watchdog::{FaultPolicy, RetainMode, WatchdogPolicy};
 
 #[derive(Debug, Clone)]
 pub struct RuntimeSettings {
+    pub cycle_interval: Duration,
     pub log_level: SmolStr,
     pub watchdog: WatchdogPolicy,
     pub fault_policy: FaultPolicy,
@@ -18,12 +22,14 @@ pub struct RuntimeSettings {
     pub web: WebSettings,
     pub discovery: DiscoverySettings,
     pub mesh: MeshSettings,
+    pub runtime_cloud: RuntimeCloudSettings,
     pub opcua: OpcUaSettings,
     pub simulation: SimulationSettings,
 }
 
 impl RuntimeSettings {
     pub fn new(
+        cycle_interval: Duration,
         base: BaseSettings,
         web: WebSettings,
         discovery: DiscoverySettings,
@@ -31,6 +37,7 @@ impl RuntimeSettings {
         simulation: SimulationSettings,
     ) -> Self {
         Self {
+            cycle_interval,
             log_level: base.log_level,
             watchdog: base.watchdog,
             fault_policy: base.fault_policy,
@@ -39,6 +46,7 @@ impl RuntimeSettings {
             web,
             discovery,
             mesh,
+            runtime_cloud: RuntimeCloudSettings::default(),
             opcua: OpcUaSettings::default(),
             simulation,
         }
@@ -68,16 +76,38 @@ pub struct DiscoverySettings {
     pub service_name: SmolStr,
     pub advertise: bool,
     pub interfaces: Vec<SmolStr>,
+    pub host_group: Option<SmolStr>,
 }
 
 #[derive(Debug, Clone)]
 pub struct MeshSettings {
     pub enabled: bool,
+    pub role: MeshRole,
     pub listen: SmolStr,
+    pub connect: Vec<SmolStr>,
     pub tls: bool,
     pub auth_token: Option<SmolStr>,
     pub publish: Vec<SmolStr>,
     pub subscribe: IndexMap<SmolStr, SmolStr>,
+    pub zenohd_version: SmolStr,
+    pub plugin_versions: IndexMap<SmolStr, SmolStr>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeCloudSettings {
+    pub profile: RuntimeCloudProfile,
+    pub wan_allow_write: Vec<RuntimeCloudWanAllowRule>,
+    pub link_preferences: Vec<RuntimeCloudLinkPreferenceRule>,
+}
+
+impl Default for RuntimeCloudSettings {
+    fn default() -> Self {
+        Self {
+            profile: RuntimeCloudProfile::Dev,
+            wan_allow_write: Vec::new(),
+            link_preferences: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

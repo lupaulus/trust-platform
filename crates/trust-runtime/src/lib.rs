@@ -47,10 +47,14 @@ mod numeric;
 pub mod opcua;
 /// PLCopen XML import/export helpers (strict subset profile).
 pub mod plcopen;
+/// Deterministic same-host realtime (T0/HardRT) communication contracts.
+pub mod realtime;
 /// Local package registry contracts and workflows.
 pub mod registry;
 /// Retain storage support.
 pub mod retain;
+/// Runtime cloud contract and UI projection helpers.
+pub mod runtime_cloud;
 /// Resource scheduling helpers and clocks.
 pub mod scheduler;
 /// Security roles and authorization helpers.

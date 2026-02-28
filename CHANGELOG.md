@@ -6,10 +6,100 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 ## [Unreleased]
 
-Target release: `v0.9.17`
+Target release: `v0.9.19`
 
 ### Added
 
+- IDE settings coverage expanded for standalone/offline authoring: new fields for control endpoint/resource name, runtime cloud profile, extended OPC UA options, and observability options.
+- IDE settings discoverability improvements: `/ide/settings` now opens in an `All Settings` view by default and adds filter-by-name/key search so MQTT/PLC/TLS/realtime/debug configuration is immediately accessible.
+- IDE settings reliability hardening: `/ide/settings` now includes standalone `simulation.toml` controls (`simulation.enabled`, `simulation.seed`, `simulation.time_scale`), shows active filter summary/clear controls to prevent hidden-field confusion, and limits live `config.set` writes to backend-supported keys to avoid false save failures.
+- IDE settings navigation hardening: hardware/quick-action jumps now auto-clear stale settings filters and auto-fallback to the owning category (or `All Settings`) so target fields are always visible when jumping to PLC/MQTT/TLS/realtime/debug settings.
+- IDE I/O settings completeness hardening: both Settings and Hardware editors now preserve `use_system_io` from loaded I/O configs instead of silently forcing it to `false` on save.
+- Default standalone Web IDE demo project (`examples/web_ui_complete_project`) now includes a multi-driver `io.toml` (Modbus TCP, MQTT, EtherCAT mock, GPIO, Simulated) so Hardware and Settings communication flows are populated immediately.
+- IDE communication workflow hardening in the unified shell:
+  - Settings now shows inline JSON examples for `runtime_cloud.wan.allow_write_json` and `runtime_cloud.links.transports_json`.
+  - Realtime link rule parsing now accepts `source/target`, `from/to`, and `pattern` aliases for faster authoring while still writing valid `runtime.cloud.links.transports` TOML entries.
+  - Runtime-cloud link transport support now spans `realtime`, `zenoh`, `mesh`, `mqtt`, `modbus-tcp`, `opcua`, `discovery`, and `web` across runtime schema validation, config APIs, and the Hardware/Settings editors.
+  - Hardware `Add Link` flow now uses an in-UI transport picker (all 8 transports) plus guided source/target hinting instead of raw text prompt input.
+  - Hardware inspector now deep-links all communication/runtime-cloud modules to their exact Settings fields.
+  - Added MQTT connectivity probe route `POST /api/io/mqtt-test` and Hardware inspector `Test Connection` support for MQTT alongside Modbus TCP.
+  - Hardware communication cards now also project `runtime.cloud.wan.allow_write` as `Cloud WAN Access`.
+- IDE mobile responsiveness hardening for `/ide`: stacked layout now keeps the main workspace visible on narrow screens and avoids sidebar-only view lockups.
+- Fixed settings schema mismatch for Modbus `on_error`: UI options now match runtime driver-supported values (`fault`, `warn`, `ignore`).
+- Unified Web IDE shell with tab-based navigation (Code | Hardware | Settings | Logs):
+  - Root `/` and `/setup` now redirect to `/ide`.
+  - Legacy fleet web routes removed from the runtime web server (`/fleet`, `/app.js`, `/styles.css`, `/runtime-cloud-utils.js`, and legacy `/modules/*` fleet assets).
+  - Added standalone browser IDE startup via `trust-runtime ide serve --project <path> --listen <addr>` (with deprecated alias `trust-runtime config-ui serve`).
+  - Tab deep links: `/ide/code`, `/ide/hardware`, `/ide/settings`, `/ide/logs`.
+  - Keyboard navigation: Ctrl+1..4 for tab switching, URL history with pushState.
+  - Hardware tab: Cytoscape topology canvas, module palette with drag-and-drop, auto-address allocation, property editor with per-driver forms (Modbus TCP, MQTT, GPIO, EtherCAT), address map table with conflict/unused/used-in-code highlighting, live I/O value polling.
+  - Hardware tab now auto-hydrates from workspace `io.toml` via new `/api/ide/io/config` endpoint so configured hardware/communication drivers appear on the canvas immediately (including deep-link `/ide/hardware` loads).
+  - Hardware tab now renders a full workspace layout (summary KPI cards, surface controls, driver/runtime communication cards, persistent inspector), fixes tab-shell row sizing so content fills the page (status bar no longer consumes the main viewport), and hydrates runtime communication sections from `runtime.toml` into the hardware communication view.
+  - Hardware tab now also hydrates from `runtime.toml` communication sections when `io.toml` is missing, so standalone projects still show communication modules on the canvas instead of an empty hardware view.
+  - Settings tab: categorized form (General, Execution, Retention, Communication, Security, Advanced), direct runtime.toml editing, settings export/reset.
+  - Logs tab: unified log view with severity/source/text filtering, alarm acknowledgment, CSV export.
+  - Logs CSV export filenames now follow the user-story format exactly: `truST-logs-YYYY-MM-DD-HHMMSS.csv`.
+  - Connection dialog: mDNS discovery scan, manual connect, recent connections.
+  - Deploy flow: error gating, confirmation, sync status indicator (in-sync/modified/not-deployed).
+  - Debug integration: breakpoints with gutter decorations, debug toolbar (Continue/Step Over/Step Into/Step Out/Stop), variables/call stack/watch panels, live inline value annotations, I/O force/unforce with warning banner.
+  - New IDE modules: `ide-tabs.js`, `ide-hardware.js`, `ide-online.js`, `ide-debug.js`, `ide-settings.js`, `ide-logs.js`.
+  - New CSS: `ide-06.css` (tabs), `ide-07.css` (hardware), `ide-08.css` (online/debug), `ide-09.css` (settings/logs).
+  - 5 new unified shell contract integration tests in `web_ide_integration_part_09.rs`.
+  - IDE session bootstrap now recovers reliably in standalone mode by persisting/reusing session tokens across reloads and evicting the stalest inactive session when the session cap is reached (prevents repeated `/api/ide/session` 429 lockouts during active web-UI development).
+  - Hardware canvas labels now compact long address ranges and enable wrapped node text to keep TOML-derived module/address data legible on the graph.
+  - Hardware Cytoscape theming now resolves IDE CSS variables to concrete colors and updates on theme changes, eliminating runtime style warnings while preserving light/dark parity.
+  - Hardware tab visual redesign now uses a canvas-first layout with a much larger default graph surface, collapsible inspector/driver panels, in-canvas communication legend/filter controls, center/fullscreen actions, and SVG-based component iconography (replacing emoji palette glyphs) for a modernized runtime topology editing workflow.
+  - Hardware node art polish pass now upgrades node cards with richer per-protocol gradients/glows, glass label treatment, and higher-fidelity SVG chip icons (including distinct analog/communication module icon rendering) without changing interaction workflow.
+  - Hardware node visuals now render generated card-style SVG backgrounds per node (runtime/endpoint/module variants with accent rails + icon chips) and enforce higher minimum zoom/readability so topology labels/icons stay legible at dense graph sizes.
+  - Hardware canvas visual hardening now uses Cytoscape-safe SVG icon rendering for node cards (fixes missing icon layers in Chromium canvas rendering) and retunes card dimensions/colors for a cleaner production graph look.
+  - Hardware tab chrome simplification removes summary KPI cards, runtime/fabric control strip, and active-link/legend toolbar from the canvas stage so palette + topology become the primary workflow surface.
+  - Hardware node context menu now de-duplicates endpoint settings navigation: endpoint nodes expose only one settings jump action while runtime nodes keep separate runtime and communication settings actions.
+- Runtime cloud multi-host topology demo pack:
+  - Added `examples/runtime_cloud/multi_host_topology_demo/` with `bootstrap.sh`, `start-5.sh`, and `stop-5.sh`.
+  - Added per-runtime sample configs for 5 runtimes (`runtime-a`..`runtime-e`) with mixed `mqtt`, `modbus-tcp`, `ethercat`, `simulated`, and `loopback` I/O profiles.
+  - Added preloaded manual topology seed (`topology-devices.runtime-a.json`) to exercise host containers, manual devices, and module-slot rendering during UI testing.
+  - Changed bootstrap defaults to TOML/API-first: manual topology JSON and legacy link-transport JSON are now opt-in only (`TRUST_TOPOLOGY_DEMO_SEED_MANUAL=1`, `TRUST_TOPOLOGY_DEMO_SEED_LINK_JSON=1`).
+  - Added TOML runtime-cloud link preference support via `runtime.cloud.links.transports` and seeded demo link lanes from `runtime-a.toml`.
+  - Added TOML discovery host grouping via `runtime.discovery.host_group` and host-group-aware runtime-cloud same-host evaluation for localhost multi-host demos.
+- Runtime cloud topology visual map in Web UI:
+  - Reworked `Network -> Topology` into a graphical runtime map with box nodes and connection lines.
+  - Added at-a-glance status-focused KPIs (`online`, `degraded`, `offline`, link health) for operator use.
+  - Moved diagnostic-heavy controls (filters, tables, timeline, rollout/config control surfaces) into a collapsed advanced section to reduce default clutter.
+- Runtime cloud edge transport switching in Fleet view:
+  - Clicking topology links or edge cards now allows direct `Realtime` / `Zenoh` transport switching.
+  - Added `/api/runtime-cloud/links/transport` with same-host validation for `realtime` routing preferences.
+  - Fleet topology state now reflects selected link transport (`t0_hard_rt` overlay for realtime links).
+  - Promoted topology to primary workflow with in-canvas plane/keyspace/issue filters, contextual node/edge inspector, and batch action bar for selected runtimes.
+  - Moved compact timeline controls into topology map while keeping deep diagnostics under the advanced drawer to reduce default UI clutter.
+  - Communication lines now render per-lane overlays (Zenoh + optional Realtime), with left-click showing only critical lane status/settings and right-click lane actions for add/remove realtime communication.
+- Fleet topology deterministic ownership slots:
+  - Fleet topology now renders runtime-owned driver nodes (`mqtt`, `modbus`, `ethercat`, `opcua`, `gpio`) between runtimes and endpoints.
+  - Host assignment is enforced for operational endpoints: remote/discovered endpoints attach to deterministic external host containers instead of free-floating.
+  - Topology edit flow now requires host placement for manual devices and blocks host removal that would orphan hosted devices.
+  - Runtime cards now reserve deterministic in-card driver slot zones and driver cards render as compact protocol chips anchored to those fixed slots.
+  - Empty host containers are hidden in normal view when they have no runtime or endpoint children.
+  - Runtime/device cards now render a single border layer (removed Cytoscape outer border) to match card design and avoid double-outline artifacts.
+  - Runtime card subtitle no longer duplicates health state when the status badge already shows it.
+  - Driver slot placeholders now render without static protocol text; labels appear only on occupied slots.
+  - Driver nodes are now non-draggable to preserve deterministic runtime slot placement.
+  - Device edges are normalized to bind via runtime-owned driver nodes (including manual runtime->endpoint edges), and render as direct source-to-target lines from the driver chip.
+  - Runtime cards now render driver summary text in the body while driver chips are laid out as a single deterministic bottom row (no multi-row chip stacks).
+  - Driver chips now include compact protocol context subtitles (for example broker/address/adapter/internal) for faster visual inspection.
+  - Host compound labels are pinned inside host containers for clearer ownership headings.
+  - Carousel priming now guards missing `runtimeCloudState` to prevent early-page-load `ReferenceError` in browser console.
+  - Fleet graph position caches are now layout-versioned and auto-relayout when stale pinned positions overlap runtime cards.
+  - External-only host groups now use deterministic anchor lanes so remote endpoint hosts do not collapse onto `(0,0)` and overlap each other.
+  - Runtime-internal I/O drivers (`simulated`, `loopback`) now render as deterministic runtime-owned driver cards.
+  - Comms add-driver flow now includes `loopback` alongside `simulated` for runtime-internal I/O driver configuration.
+  - Modbus canonical endpoint normalization now handles `address` values that already include `:port` (prevents malformed duplicate-port canonical keys).
+  - Demo topology seed data now keeps manual endpoints hosted (no hostless manual operational devices).
+  - Added config-mode runtime topology writeback endpoints: `POST /api/config-ui/runtime/create` and `POST /api/config-ui/runtime/delete`.
+  - Topology edit UI now supports runtime create/remove actions in edit mode and routes adapter actions through TOML-backed config flows.
+  - Added config-ui live connection manager APIs (`GET/POST /api/config-ui/live/targets`, `POST /api/config-ui/live/targets/remove`, `POST /api/config-ui/live/connect`, `GET /api/config-ui/live/state`) with in-memory target profiles and read-only runtime-cloud polling.
+  - Added config-ui runtime lifecycle provider APIs (`GET/POST /api/config-ui/runtime/lifecycle`) for runtime status/probe plus managed start/stop/restart actions.
+  - Config-mode `/api/runtime-cloud/state` now supports read-only live overlay of node/edge health from connected runtime-cloud snapshots without changing TOML-derived topology ownership/layout.
+  - Added config-ui integration tests for runtime create/delete and ST/runtime conflict-safe writeback paths.
+  - Removed active topology-devices overlay route dependency; runtime/config topology remains TOML/API-driven.
 - PLCopen CODESYS global/folder parity:
   - `trust-runtime plcopen import` now imports CODESYS `addData/globalVars` into ST `VAR_GLOBAL` sources (plaintext-first with variable-node synthesis fallback).
   - CODESYS `addData/projectstructure` object trees are now used to place imported POUs/GVLs into mirrored `src/` subfolders (for example `src/Application/...`).
@@ -19,18 +109,6 @@ Target release: `v0.9.17`
   - Added editor lifecycle test coverage to verify running statechart sessions are cleaned up when a custom editor panel is disposed.
   - Added state machine engine behavior tests for awaited hardware action ordering and fail-closed guard evaluation paths.
   - Added runtime client timeout cleanup coverage to ensure request listeners are removed on timeout/error.
-- VS Code Ladder Logic editor:
-  - Added a custom editor for `.ladder.json` files with simulation/hardware execution modes and runtime I/O integration.
-  - Added ladder webview build pipeline/assets and example programs under `examples/ladder/`.
-  - Updated `examples/hardware_8do/README.md` to document ladder/blockly/statechart usage against the shared hardware backend.
-  - Added rung wire visualization and an in-editor properties panel for contact/coil editing, position updates, and element delete actions.
-  - Added rung removal controls and pan interactions (Space + drag / middle mouse drag) in the ladder canvas.
-  - Migrated ladder program contract to schema v2 (`schemaVersion: 2`, `networks[]`, `nodes[]`, `edges[]`) with explicit legacy schema rejection.
-  - Added timer/counter/compare/math block insertion, rendering, and property editing in the ladder webview.
-  - Refactored ladder webview architecture to satisfy SOLID/KISS boundaries by splitting properties and node-drawing responsibilities into dedicated modules.
-  - Added deterministic `.st` companion generation for `.ladder.json`, `.blockly.json`, and `.statechart.json` sources on save and create/import flows.
-  - Generated companions now emit function blocks so visual logic can be composed inside standard ST projects without requiring custom editors at runtime.
-  - Switched visual custom editors (`ladder`, `blockly`, `statechart`) to optional priority so text-first `.st` workflows remain the default.
 - Web IDE project selection flow:
   - Added `/api/ide/project` and `/api/ide/project/open` to query/switch active project root at runtime.
   - Added no-bundle startup support for `trust-runtime run` so `/ide` can start first and open a project folder from the browser.
@@ -224,6 +302,11 @@ Target release: `v0.9.17`
 
 ### Changed
 
+- Local developer test workflow acceleration:
+  - `just test` now uses `cargo-nextest` for the default local loop (`trust-runtime` library tests), with automatic fallback to `cargo test` if `nextest` is unavailable.
+  - Added split test targets in `justfile`: `test-integration`, `test-e2e`, and `test-all` (full previous gate).
+  - Enabled faster local linking via `mold` (`.cargo/config.toml`) and enabled `sccache` as Cargo `rustc-wrapper`.
+  - Reduced dev/test debug symbol level to `debug = 1` for faster incremental compile/link during local iteration.
 - PLCopen CODESYS import hardening:
   - `trust-runtime plcopen import` now maps CODESYS `{attribute 'qualified_only'}` global variable lists into a compiler-valid `TYPE + CONFIGURATION/VAR_GLOBAL` wrapper model instead of emitting unsupported top-level `VAR_GLOBAL` files.
   - Imported POUs that reference qualified lists (for example `GVL.start`) now receive injected `VAR_EXTERNAL` declarations so cross-file global access resolves in trust-lsp/runtime builds.
@@ -290,13 +373,17 @@ Target release: `v0.9.17`
 
 ### Fixed
 
-- Blockly ST generation now preserves connected statement chains (`next`) and Blockly control-slot names (`IF0`/`DO0`), preventing dropped statements in generated programs.
-- Blockly runtime control requests now clear timeout handles on response/connection teardown to avoid stale timer leaks during long editing sessions.
-- Blockly webview CSP no longer permits inline scripts.
-- VS Code extension activation now registers both Blockly and Ladder custom editors after merge integration, preserving `.blockly.json` and `.ladder.json` editor routing.
-- Ladder webview CSP no longer permits inline scripts.
-- Ladder editor element placement now works when clicking canvas content (grid/rung shapes), fixing missed insertions for contact/coil placement.
-- Ladder editor drag/drop now snaps consistently and supports explicit pan mode without breaking element move interactions.
+- Standalone Web IDE bootstrap now serves fully composed split module assets (`ide-editor-language`, `ide-editor-pane`, `ide-workspace-tree`, `ide-workspace-files`, `ide-observability`, `ide-commands`) so session startup/open-project flows no longer fail with missing runtime symbols (for example `refreshProjectSelection`).
+- Standalone Web IDE bootstrap no longer stalls waiting for WASM analysis readiness when the analysis worker repeatedly restarts; IDE startup now completes and remains usable with analysis disabled.
+- Web IDE UI-mode detection now accepts both wrapped (`{ok,result}`) and direct (`{ok,mode}`) API payloads, restoring correct standalone-mode behavior (for example disabling runtime-only controls in `standalone-ide` mode).
+- Web IDE Hardware tab now rehydrates after IDE session bootstrap events (including deep-link startup on `/ide/hardware`) and performs delayed canvas relayout/fit passes after tab activation so hardware + communication modules from `io.toml`/`runtime.toml` reliably render without clipped/off-screen graphs.
+- Web IDE workspace tabs now publish explicit ARIA tab semantics (`tablist`/`tab`/`tabpanel`, `aria-selected`, and active-tab `tabindex` management) for keyboard/screen-reader correctness.
+- Config-UI Fleet topology projection no longer reports planned runtimes/endpoints as online by default; `/api/runtime-cloud/state` in config mode now renders offline/degraded runtime state and failed links until live runtime connectivity exists.
+- Config-UI now serves read-only `/api/runtime-cloud/config` and `/api/runtime-cloud/rollouts` snapshots in offline mode to prevent Web UI polling 404 noise during TOML/ST-only editing sessions.
+- Runtime cloud 5-host topology demo is now self-contained and deterministic: `start-5.sh` auto-bootstraps missing projects, performs clean restarts, waits for runtime-cloud readiness, and ships explicit mesh/link-transport seed data for mixed `realtime`/`zenoh` topology behavior.
+- Fleet/Comms add-driver deep-link handling now preserves unknown preselected driver types instead of silently falling back to `modbus-tcp`.
+- Fleet/Comms schema-number handling now preserves valid `0` values (for example Modbus `unit_id = 0`) and enforces min/max validation before save.
+- Fleet topology device context menu now resolves touch coordinates reliably (long-press/taphold) and always unregisters its outside-click dismissal listener on close.
 - VS Code statechart custom editor packaging now loads the webview template from bundled extension code instead of `src/**` runtime paths excluded by `.vscodeignore`.
 - VS Code statechart editor lifecycle now stops active execution sessions when the panel closes, ensuring timers/runtime connections are cleaned up.
 - State machine engine transition execution now awaits exit/transition/entry hardware actions before completing transitions.

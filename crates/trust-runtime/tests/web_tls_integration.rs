@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 
 use indexmap::IndexMap;
+use rustls::pki_types::ServerName;
 use smol_str::SmolStr;
 use trust_runtime::config::{ControlMode, WebAuthMode, WebConfig};
 use trust_runtime::control::{ControlState, HmiRuntimeDescriptor, SourceFile, SourceRegistry};
@@ -19,11 +20,13 @@ use trust_runtime::security::{rustls_client_config, TlsMaterials};
 use trust_runtime::settings::{
     BaseSettings, DiscoverySettings, MeshSettings, RuntimeSettings, SimulationSettings, WebSettings,
 };
+use trust_runtime::value::Duration as PlcDuration;
 use trust_runtime::watchdog::{FaultPolicy, RetainMode, WatchdogPolicy};
 use trust_runtime::web::start_web_server;
 
 fn runtime_settings() -> RuntimeSettings {
     RuntimeSettings::new(
+        PlcDuration::from_millis(10),
         BaseSettings {
             log_level: SmolStr::new("info"),
             watchdog: WatchdogPolicy::default(),
@@ -42,14 +45,19 @@ fn runtime_settings() -> RuntimeSettings {
             service_name: SmolStr::new("truST"),
             advertise: false,
             interfaces: Vec::new(),
+            host_group: None,
         },
         MeshSettings {
             enabled: false,
+            role: trust_runtime::config::MeshRole::Peer,
             listen: SmolStr::new("127.0.0.1:0"),
+            connect: Vec::new(),
             tls: false,
             auth_token: None,
             publish: Vec::new(),
             subscribe: IndexMap::new(),
+            zenohd_version: SmolStr::new("1.7.2"),
+            plugin_versions: IndexMap::new(),
         },
         SimulationSettings {
             enabled: false,
@@ -132,8 +140,8 @@ fn reserve_loopback_port() -> u16 {
 fn https_get_raw(listen: &str, path: &str, materials: &TlsMaterials) -> anyhow::Result<String> {
     let config = rustls_client_config(materials)
         .map_err(|err| anyhow::anyhow!("build tls client config: {err}"))?;
-    let server_name =
-        rustls::ServerName::try_from("localhost").map_err(|_| anyhow::anyhow!("server name"))?;
+    let server_name = ServerName::try_from("localhost".to_string())
+        .map_err(|_| anyhow::anyhow!("server name"))?;
     let tcp = TcpStream::connect(listen)?;
     let connection = rustls::ClientConnection::new(config, server_name)?;
     let mut stream = rustls::StreamOwned::new(connection, tcp);
@@ -143,7 +151,17 @@ fn https_get_raw(listen: &str, path: &str, materials: &TlsMaterials) -> anyhow::
     )?;
     stream.flush()?;
     let mut response = String::new();
-    stream.read_to_string(&mut response)?;
+    if let Err(err) = stream.read_to_string(&mut response) {
+        // tiny_http may close the socket without TLS close_notify after fully writing
+        // the response body. Accept that EOF when payload bytes were already received.
+        let tolerated = !response.is_empty()
+            && err
+                .to_string()
+                .contains("peer closed connection without sending TLS close_notify");
+        if !tolerated {
+            return Err(err.into());
+        }
+    }
     Ok(response)
 }
 

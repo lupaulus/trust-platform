@@ -49,10 +49,8 @@ pub(crate) fn var_decl_info_for_name(root: &SyntaxNode, source: &str, name: &str
     }
 }
 
-pub(crate) fn find_var_decl_for_range(
-    root: &SyntaxNode,
-    symbol_range: TextRange,
-) -> Option<SyntaxNode> {
+/// Finds the variable declaration whose identifier matches or encloses `symbol_range`.
+pub fn find_var_decl_for_range(root: &SyntaxNode, symbol_range: TextRange) -> Option<SyntaxNode> {
     let by_exact_ident = root
         .descendants()
         .filter(|node| node.kind() == SyntaxKind::VarDecl)

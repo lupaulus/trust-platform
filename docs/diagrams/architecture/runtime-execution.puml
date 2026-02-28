@@ -146,8 +146,20 @@ package "Lifecycle" as lifecyclePkg #LightGray {
     rectangle "startup()" as startupFlow #Wheat {
         card "1. load_retain()" as start1
         card "2. init globals/IO" as start2
+        card "2a. provision T0 SHM channels\n(map shared + initialize headers + pin pages)" as start2a
         card "3. start tasks" as start3
     }
+
+    start1 --> start2
+    start2 --> start2a
+    start2a --> start3
+
+    note right of start2a
+        fail-fast contract:
+        • required SHM create/open failure => startup abort
+        • required page pinning failure => startup abort
+        • publish readiness metadata for _meta/shm_channels
+    end note
 
     rectangle "shutdown()" as shutdownFlow #Wheat {
         card "1. stop tasks" as stop1
@@ -159,7 +171,7 @@ package "Lifecycle" as lifecyclePkg #LightGray {
 ' CONTROL + HMI CONTRACT
 ' ============================================================
 package "Control + HMI Contract" as hmiPkg #Lavender {
-    rectangle "Control API (control.rs)" as hmiControl #Wheat {
+    rectangle "Control API (control/transport.rs + control/* handlers)" as hmiControl #Wheat {
         card "hmi.schema.get\n(read-only schema from metadata)" as hmiSchema
         card "load customization\n(@hmi + hmi.toml)" as hmiCustomize
         card "merge precedence:\ndefaults < annotation < file" as hmiMerge
@@ -172,7 +184,7 @@ package "Control + HMI Contract" as hmiPkg #Lavender {
     }
 
     rectangle "Web HMI (/hmi)" as hmiWeb #Wheat {
-        card "GET /hmi, /hmi/app.js, /hmi/styles.css" as hmiRoute
+        card "GET /hmi, /hmi/app.js, /hmi/styles.css,\n/hmi/modules/hmi-*.js" as hmiRoute
         card "sidebar navigation:\ndashboard/trend/alarm/table/process" as hmiNav
         card "poll POST /api/control every 500 ms\n(values/trends/alarms)" as hmiPoll
         card "status badges:\nconnection + freshness" as hmiStatus
@@ -182,12 +194,20 @@ package "Control + HMI Contract" as hmiPkg #Lavender {
     }
 
     rectangle "Web IDE Preview (/ide)" as ideWeb #Wheat {
-        card "GET /ide\n(preview shell)" as ideRoute
+        card "GET /ide + /ide/modules/ide-*.js\n(preview shell + modular UI bundles)" as ideRoute
         card "GET /api/ide/capabilities\n(scope + limits + mode)" as ideCaps
         card "POST /api/ide/session\n(auth -> session token)" as ideSession
         card "GET /api/ide/files\n(list sources/**/*.st)" as ideFiles
         card "GET /api/ide/file\n(open path + version)" as ideOpen
         card "POST /api/ide/file\n(expected_version + content)" as ideWrite
+    }
+
+    rectangle "Terminal Console (ui/*)" as tuiContract #Wheat {
+        card "ui.rs facade:\nrun_ui loop + orchestration" as tuiFacade
+        card "client.rs:\nendpoint/auth + control transport" as tuiClient
+        card "parsing.rs + state.rs:\nsnapshots + prompt/session state" as tuiState
+        card "input.rs + commands/*:\nkey handling + action routing" as tuiInput
+        card "render.rs:\npanel/prompt presentation" as tuiRender
     }
 
     hmiSchema --> hmiCustomize
@@ -213,6 +233,10 @@ package "Control + HMI Contract" as hmiPkg #Lavender {
     ideSession --> ideFiles
     ideFiles --> ideOpen
     ideOpen --> ideWrite
+    tuiFacade --> tuiClient
+    tuiFacade --> tuiState
+    tuiFacade --> tuiInput
+    tuiFacade --> tuiRender
 
     note right of ideWrite
         security boundary:
@@ -222,6 +246,12 @@ package "Control + HMI Contract" as hmiPkg #Lavender {
         • writes allowed only in debug mode
         • optimistic conflict check via expected_version
         • source scope limited to sources/**/*.st
+    end note
+
+    note right of hmiWeb
+        web transport boundary:
+        • accept loop + HTTP lifecycle in web/server.rs
+        • route handlers split by concern in web/*_routes.rs
     end note
 }
 

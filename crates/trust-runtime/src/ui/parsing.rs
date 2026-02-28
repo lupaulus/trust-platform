@@ -52,30 +52,7 @@ pub(super) fn parse_status(response: &serde_json::Value) -> Option<StatusSnapsho
             .and_then(|m| m.get("faults"))
             .and_then(|v| v.as_u64())
             .unwrap_or_default(),
-        drivers: result
-            .get("drivers")
-            .and_then(|v| v.as_array())
-            .map(|arr| {
-                arr.iter()
-                    .map(|entry| DriverSnapshot {
-                        name: entry
-                            .get("name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("driver")
-                            .to_string(),
-                        status: entry
-                            .get("status")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("unknown")
-                            .to_string(),
-                        error: entry
-                            .get("error")
-                            .and_then(|v| v.as_str())
-                            .map(|s| s.to_string()),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default(),
+        drivers: parse_status_drivers(result),
         debug_enabled: result
             .get("debug_enabled")
             .and_then(|v| v.as_bool())
@@ -101,6 +78,35 @@ pub(super) fn parse_status(response: &serde_json::Value) -> Option<StatusSnapsho
             .unwrap_or("")
             .to_string(),
     })
+}
+
+fn parse_status_drivers(result: &serde_json::Value) -> Vec<DriverSnapshot> {
+    let drivers = result
+        .get("io_drivers")
+        .or_else(|| result.get("drivers"))
+        .and_then(|v| v.as_array());
+    drivers
+        .map(|arr| {
+            arr.iter()
+                .map(|entry| DriverSnapshot {
+                    name: entry
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("driver")
+                        .to_string(),
+                    status: entry
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    error: entry
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 pub(super) fn parse_tasks(response: &serde_json::Value) -> Vec<TaskSnapshot> {
@@ -220,6 +226,15 @@ pub(super) fn parse_events(response: &serde_json::Value) -> Vec<EventSnapshot> {
 pub(super) fn parse_settings(response: &serde_json::Value) -> Option<SettingsSnapshot> {
     let result = response.get("result")?;
     Some(SettingsSnapshot {
+        cycle_interval_ms: result
+            .get("resource.cycle_interval_ms")
+            .and_then(|v| v.as_u64())
+            .or_else(|| {
+                result
+                    .get("resource.cycle_interval_ms")
+                    .and_then(|v| v.as_i64())
+                    .and_then(|v| u64::try_from(v).ok())
+            }),
         log_level: result
             .get("log.level")
             .and_then(|v| v.as_str())

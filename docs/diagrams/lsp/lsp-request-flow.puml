@@ -12,8 +12,8 @@ title LSP Request Flow Sequences
 
 participant "VS Code\nClient" as client #LightBlue
 participant "tower-lsp\nServer" as server #LightGreen
-participant "StLanguageServer" as lsp <<main.rs:16>>
-participant "ServerState" as state <<state.rs:40>>
+participant "StLanguageServer" as lsp <<main.rs>>
+participant "ServerState" as state <<state.rs>>
 participant "ServerContext\n(trait)" as context
 participant "handlers/*" as handlers
 participant "Project" as project
@@ -58,6 +58,13 @@ deactivate lsp
 note right of handlers
     Indexes all .st files
     in workspace folders
+end note
+
+note right of handlers
+    Feature layer is decomposed into
+    completion/navigation/actions/
+    symbols/hierarchy modules with a
+    thin core facade.
 end note
 
 ' ============================================================
@@ -456,17 +463,17 @@ server --> client
 
 note right of client
     **Key Files:**
-    • trust-lsp/src/main.rs:16 - StLanguageServer
-    • trust-lsp/src/state.rs:40 - ServerState
+    • trust-lsp/src/main.rs - StLanguageServer
+    • trust-lsp/src/state.rs - ServerState
     • trust-lsp/src/handlers/*.rs - Request handlers
     • trust-ide/src/*.rs - IDE features
     • trust-hir/src/project.rs - Project + SourceRegistry
     • trust-hir/src/db/queries.rs - Database
 
-    **ServerState (state.rs:40-49):**
-    documents: RwLock<FxHashMap<Url, Document>> (line 42)
-    project: RwLock<Project> (line 44)
-    workspace_folders: RwLock<Vec<Url>> (line 47)
+    **ServerState (state.rs):**
+    documents: RwLock<FxHashMap<Url, Document>>
+    project: RwLock<Project>
+    workspace_folders: RwLock<Vec<Url>>
 
     **IDE Functions (trust-ide/src/lib.rs):**
     • complete() - Completion

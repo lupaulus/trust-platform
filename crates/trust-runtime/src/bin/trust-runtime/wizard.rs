@@ -134,7 +134,7 @@ pub fn create_bundle_auto(path: Option<PathBuf>) -> anyhow::Result<PathBuf> {
     let (resource_name, cycle_ms) = if runtime_path.exists() {
         let runtime = trust_runtime::config::RuntimeConfig::load(&runtime_path)?;
         (
-            SmolStr::new(runtime.resource_name.to_string()),
+            SmolStr::new(&runtime.resource_name),
             runtime.cycle_interval.as_millis() as u64,
         )
     } else {

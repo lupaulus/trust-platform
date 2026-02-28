@@ -18,6 +18,19 @@ Implementation planning notes and remediation checklists live in `docs/internal/
 Hands-on setup tutorials and example learning tracks are indexed in:
 `examples/README.md`.
 
+## Runtime Cloud Manual
+
+User-facing runtime cloud onboarding docs are here:
+- `docs/guides/RUNTIME_CLOUD_MANUAL.md`
+- `docs/guides/RUNTIME_CLOUD_QUICKSTART.md`
+- `docs/guides/RUNTIME_CLOUD_PROFILE_COOKBOOK.md`
+- `docs/guides/RUNTIME_CLOUD_FEDERATION_GUIDE.md`
+- `docs/guides/RUNTIME_CLOUD_UI_WALKTHROUGH.md`
+- `docs/guides/RUNTIME_CLOUD_TROUBLESHOOTING.md`
+
+Runnable payload/config examples:
+- `examples/runtime_cloud/README.md`
+
 ## HMI Directory Workflow
 
 Production `hmi/` descriptor usage (including process SVG pages and LM tool

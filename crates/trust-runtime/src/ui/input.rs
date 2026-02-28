@@ -297,3 +297,28 @@ pub(super) fn handle_prompt_confirm(
     state.prompt.mode = PromptMode::Normal;
     Ok(false)
 }
+
+pub(super) fn handle_confirm(
+    action: ConfirmAction,
+    key: KeyEvent,
+    client: &mut ControlClient,
+) -> anyhow::Result<bool> {
+    match key.code {
+        KeyCode::Char('y') | KeyCode::Char('Y') => {
+            let request = match action {
+                ConfirmAction::RestartWarm => {
+                    json!({"id": 1, "type": "restart", "params": { "mode": "warm" }})
+                }
+                ConfirmAction::RestartCold => {
+                    json!({"id": 1, "type": "restart", "params": { "mode": "cold" }})
+                }
+                ConfirmAction::Shutdown => json!({"id": 1, "type": "shutdown"}),
+                ConfirmAction::ExitConsole => return Ok(true),
+            };
+            let _ = client.request(request);
+            Ok(false)
+        }
+        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => Ok(false),
+        _ => Ok(false),
+    }
+}

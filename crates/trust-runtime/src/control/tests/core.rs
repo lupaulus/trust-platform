@@ -1,0 +1,514 @@
+#[test]
+fn request_routing_contract_dispatches_core_handler_modules() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let state = hmi_test_state(source);
+    let requests = vec![
+        json!({"id": 1, "type": "status"}),
+        json!({"id": 2, "type": "io.list"}),
+        json!({"id": 3, "type": "debug.state"}),
+        json!({"id": 4, "type": "var.forced"}),
+        json!({"id": 5, "type": "restart", "params": { "mode": "warm" }}),
+    ];
+
+    for request in requests {
+        let response = handle_request_value(request.clone(), &state, None);
+        assert_ne!(
+            response.error.as_deref(),
+            Some("unsupported request"),
+            "request should be routed by module split: {request}"
+        );
+    }
+}
+
+#[test]
+fn debug_program_and_io_handlers_preserve_behavior() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let state = hmi_test_state(source);
+
+    let pause = handle_request_value(json!({"id": 1, "type": "pause"}), &state, None);
+    assert!(pause.ok, "pause should succeed: {:?}", pause.error);
+
+    let debug_state = handle_request_value(json!({"id": 2, "type": "debug.state"}), &state, None);
+    assert!(
+        debug_state.ok,
+        "debug.state should succeed: {:?}",
+        debug_state.error
+    );
+
+    let restart = handle_request_value(
+        json!({"id": 3, "type": "restart", "params": { "mode": "warm" }}),
+        &state,
+        None,
+    );
+    assert!(restart.ok, "restart should succeed: {:?}", restart.error);
+    assert_eq!(
+        state.pending_restart.lock().ok().and_then(|guard| *guard),
+        Some(RestartMode::Warm)
+    );
+
+    let io_write = handle_request_value(
+        json!({
+            "id": 4,
+            "type": "io.write",
+            "params": { "address": "%QX0.0", "value": "true" }
+        }),
+        &state,
+        None,
+    );
+    assert!(io_write.ok, "io.write should succeed: {:?}", io_write.error);
+    assert_eq!(
+        io_write
+            .result
+            .as_ref()
+            .and_then(|result| result.get("status"))
+            .and_then(serde_json::Value::as_str),
+        Some("queued")
+    );
+}
+
+#[test]
+fn config_set_reports_field_level_diagnostics_for_unknown_and_type_errors() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let state = hmi_test_state(source);
+
+    let unknown = handle_request_value(
+        json!({
+            "id": 20,
+            "type": "config.set",
+            "params": { "unknown.key": true }
+        }),
+        &state,
+        None,
+    );
+    assert!(!unknown.ok);
+    assert_eq!(
+        unknown.error.as_deref(),
+        Some("unknown config key 'unknown.key'")
+    );
+
+    let invalid_type = handle_request_value(
+        json!({
+            "id": 21,
+            "type": "config.set",
+            "params": { "web.enabled": "yes" }
+        }),
+        &state,
+        None,
+    );
+    assert!(!invalid_type.ok);
+    assert!(invalid_type
+        .error
+        .as_deref()
+        .unwrap_or_default()
+        .contains("invalid config value for 'web.enabled': expected boolean"));
+
+    let valid_extended_transport = handle_request_value(
+        json!({
+            "id": 22,
+            "type": "config.set",
+            "params": {
+                "runtime_cloud.links.transports": [
+                    {
+                        "source": "runtime-a",
+                        "target": "runtime-b",
+                        "transport": "mqtt"
+                    }
+                ]
+            }
+        }),
+        &state,
+        None,
+    );
+    assert!(
+        valid_extended_transport.ok,
+        "extended runtime cloud transport must be accepted"
+    );
+
+    let invalid_transport = handle_request_value(
+        json!({
+            "id": 23,
+            "type": "config.set",
+            "params": {
+                "runtime_cloud.links.transports": [
+                    {
+                        "source": "runtime-a",
+                        "target": "runtime-b",
+                        "transport": "udp"
+                    }
+                ]
+            }
+        }),
+        &state,
+        None,
+    );
+    assert!(!invalid_transport.ok);
+    assert!(invalid_transport
+        .error
+        .as_deref()
+        .unwrap_or_default()
+        .contains("invalid runtime.cloud.links.transports[].transport 'udp'"));
+}
+
+#[test]
+fn config_set_reports_cross_field_auth_diagnostic() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let state = hmi_test_state(source);
+    let response = handle_request_value(
+        json!({
+            "id": 22,
+            "type": "config.set",
+            "params": { "web.auth": "token" }
+        }),
+        &state,
+        None,
+    );
+    assert!(!response.ok);
+    assert!(response
+        .error
+        .as_deref()
+        .unwrap_or_default()
+        .contains("invalid config value for 'web.auth': token mode requires control.auth_token"));
+}
+
+#[test]
+fn invalid_and_malformed_requests_return_negative_responses() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let state = hmi_test_state(source);
+
+    let invalid_line = handle_request_line("{invalid-json", &state, None)
+        .expect("invalid request should still return response line");
+    let invalid_json: serde_json::Value =
+        serde_json::from_str(&invalid_line).expect("parse invalid response");
+    let invalid_error = invalid_json
+        .get("error")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or_default();
+    assert!(invalid_error.starts_with("invalid request:"));
+
+    let unsupported =
+        handle_request_value(json!({"id": 10, "type": "does.not.exist"}), &state, None);
+    assert!(!unsupported.ok);
+    assert_eq!(unsupported.error.as_deref(), Some("unsupported request"));
+
+    let malformed_io = handle_request_value(
+        json!({"id": 11, "type": "io.write", "params": { "address": "%QX0.0" }}),
+        &state,
+        None,
+    );
+    assert!(!malformed_io.ok);
+    assert!(malformed_io
+        .error
+        .as_deref()
+        .unwrap_or_default()
+        .contains("invalid params"));
+
+    let invalid_restart = handle_request_value(
+        json!({"id": 12, "type": "restart", "params": { "mode": "sideways" }}),
+        &state,
+        None,
+    );
+    assert!(!invalid_restart.ok);
+    assert_eq!(
+        invalid_restart.error.as_deref(),
+        Some("invalid restart mode")
+    );
+}
+
+#[test]
+fn rbac_authorization_matrix_enforces_sensitive_endpoint_roles() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let mut state = hmi_test_state(source);
+    state.auth_token = Arc::new(Mutex::new(Some(SmolStr::new("admin-token"))));
+    state.control_requires_auth = true;
+    let pairing_path = pairing_file("matrix");
+    let store = Arc::new(PairingStore::load(pairing_path.clone()));
+    state.pairing = Some(store.clone());
+
+    let viewer_code = store.start_pairing();
+    let viewer_token = store
+        .claim(&viewer_code.code, Some(AccessRole::Viewer))
+        .expect("viewer token");
+    let operator_code = store.start_pairing();
+    let operator_token = store
+        .claim(&operator_code.code, Some(AccessRole::Operator))
+        .expect("operator token");
+    let engineer_code = store.start_pairing();
+    let engineer_token = store
+        .claim(&engineer_code.code, Some(AccessRole::Engineer))
+        .expect("engineer token");
+
+    let viewer_status = handle_request_value(
+        json!({"id": 50, "type": "status", "auth": viewer_token}),
+        &state,
+        None,
+    );
+    assert!(viewer_status.ok, "viewer should read status");
+
+    let viewer_restart = handle_request_value(
+        json!({"id": 51, "type": "restart", "auth": viewer_token, "params": {"mode": "warm"}}),
+        &state,
+        None,
+    );
+    assert!(!viewer_restart.ok, "viewer must not restart runtime");
+    assert!(viewer_restart
+        .error
+        .as_deref()
+        .is_some_and(|msg| msg.contains("requires role operator")));
+
+    let operator_restart = handle_request_value(
+        json!({"id": 52, "type": "restart", "auth": operator_token, "params": {"mode": "warm"}}),
+        &state,
+        None,
+    );
+    assert!(operator_restart.ok, "operator should restart runtime");
+
+    let operator_config = handle_request_value(
+        json!({"id": 53, "type": "config.set", "auth": operator_token, "params": {"log.level": "debug"}}),
+        &state,
+        None,
+    );
+    assert!(!operator_config.ok, "operator must not write config");
+    assert!(operator_config
+        .error
+        .as_deref()
+        .is_some_and(|msg| msg.contains("requires role engineer")));
+
+    let operator_hmi_write = handle_request_value(
+        json!({
+            "id": 531,
+            "type": "hmi.write",
+            "auth": operator_token,
+            "params": { "id": "resource/RESOURCE/program/Main/field/run", "value": false }
+        }),
+        &state,
+        None,
+    );
+    assert!(
+        !operator_hmi_write.ok,
+        "operator must not write HMI targets"
+    );
+    assert!(operator_hmi_write
+        .error
+        .as_deref()
+        .is_some_and(|msg| msg.contains("requires role engineer")));
+
+    let engineer_write = handle_request_value(
+        json!({
+            "id": 54,
+            "type": "io.write",
+            "auth": engineer_token,
+            "params": { "address": "%QX0.0", "value": "true" }
+        }),
+        &state,
+        None,
+    );
+    assert!(engineer_write.ok, "engineer should write I/O");
+
+    let engineer_hmi_write = handle_request_value(
+        json!({
+            "id": 541,
+            "type": "hmi.write",
+            "auth": engineer_token,
+            "params": { "id": "resource/RESOURCE/program/Main/field/run", "value": false }
+        }),
+        &state,
+        None,
+    );
+    assert!(
+        !engineer_hmi_write.ok,
+        "engineer write should still be gated by read-only defaults"
+    );
+    assert_eq!(
+        engineer_hmi_write.error.as_deref(),
+        Some("hmi.write disabled in read-only mode")
+    );
+
+    let engineer_pair_start = handle_request_value(
+        json!({"id": 55, "type": "pair.start", "auth": engineer_token}),
+        &state,
+        None,
+    );
+    assert!(!engineer_pair_start.ok, "engineer must not start pairing");
+    assert!(engineer_pair_start
+        .error
+        .as_deref()
+        .is_some_and(|msg| msg.contains("requires role admin")));
+
+    let admin_set_auth = handle_request_value(
+        json!({
+            "id": 56,
+            "type": "config.set",
+            "auth": "admin-token",
+            "params": { "control.auth_token": "new-admin-token" }
+        }),
+        &state,
+        None,
+    );
+    assert!(admin_set_auth.ok, "admin should update auth token");
+
+    let unauthorized = handle_request_value(
+        json!({"id": 57, "type": "status", "auth": "invalid-token"}),
+        &state,
+        None,
+    );
+    assert!(!unauthorized.ok);
+    assert_eq!(unauthorized.error.as_deref(), Some("unauthorized"));
+
+    let _ = std::fs::remove_file(pairing_path);
+}
+
+#[test]
+fn unauthenticated_remote_control_defaults_to_viewer_without_admin_token() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let state = hmi_test_state(source);
+
+    let remote_client = Some("127.0.0.1:55001");
+    let status = handle_request_value(json!({"id": 901, "type": "status"}), &state, remote_client);
+    assert!(status.ok, "viewer fallback should read status");
+
+    let denied = handle_request_value(
+        json!({
+            "id": 902,
+            "type": "config.set",
+            "params": { "log.level": "debug" }
+        }),
+        &state,
+        remote_client,
+    );
+    assert!(!denied.ok, "viewer fallback must not write config");
+    assert!(denied
+        .error
+        .as_deref()
+        .is_some_and(|msg| msg.contains("requires role engineer")));
+}
+
+#[test]
+fn historian_query_and_alert_control_requests_return_contract_payloads() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let mut state = hmi_test_state(source);
+    let history_path = temp_history_path("historian");
+    let hook_path = temp_history_path("hook");
+    let historian = HistorianService::new(
+        HistorianConfig {
+            enabled: true,
+            sample_interval_ms: 1,
+            mode: RecordingMode::All,
+            include: Vec::new(),
+            history_path: history_path.clone(),
+            max_entries: 500,
+            prometheus_enabled: true,
+            prometheus_path: SmolStr::new("/metrics"),
+            alerts: vec![AlertRule {
+                name: SmolStr::new("run_high"),
+                variable: SmolStr::new("Main.run"),
+                above: Some(0.5),
+                below: None,
+                debounce_samples: 1,
+                hook: Some(SmolStr::new(hook_path.to_string_lossy())),
+            }],
+        },
+        None,
+    )
+    .expect("historian");
+    let (snapshot_tx, snapshot_rx) = std::sync::mpsc::channel();
+    state
+        .resource
+        .send_command(ResourceCommand::Snapshot {
+            respond_to: snapshot_tx,
+        })
+        .expect("request runtime snapshot");
+    let snapshot = snapshot_rx
+        .recv_timeout(std::time::Duration::from_millis(250))
+        .expect("snapshot");
+    historian
+        .capture_snapshot_at(&snapshot, 1_000)
+        .expect("capture initial");
+    state.historian = Some(historian);
+
+    let query = handle_request_value(
+        json!({ "id": 80, "type": "historian.query", "params": { "limit": 20 } }),
+        &state,
+        None,
+    );
+    assert!(
+        query.ok,
+        "historian.query should succeed: {:?}",
+        query.error
+    );
+    let items = query
+        .result
+        .as_ref()
+        .and_then(|value| value.get("items"))
+        .and_then(serde_json::Value::as_array)
+        .expect("items");
+    assert!(!items.is_empty());
+
+    let alerts = handle_request_value(
+        json!({ "id": 81, "type": "historian.alerts", "params": { "limit": 20 } }),
+        &state,
+        None,
+    );
+    assert!(
+        alerts.ok,
+        "historian.alerts should succeed: {:?}",
+        alerts.error
+    );
+    let alert_items = alerts
+        .result
+        .as_ref()
+        .and_then(|value| value.get("items"))
+        .and_then(serde_json::Value::as_array)
+        .expect("alerts");
+    assert!(!alert_items.is_empty());
+
+    let _ = std::fs::remove_file(history_path);
+    let _ = std::fs::remove_file(hook_path);
+}

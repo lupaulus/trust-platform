@@ -22,7 +22,7 @@ use trust_runtime::scheduler::{ResourceCommand, ResourceControl, StdClock};
 use trust_runtime::settings::{
     BaseSettings, DiscoverySettings, MeshSettings, RuntimeSettings, SimulationSettings, WebSettings,
 };
-use trust_runtime::value::Value;
+use trust_runtime::value::{Duration, Value};
 use trust_runtime::watchdog::{FaultPolicy, RetainMode, WatchdogPolicy};
 
 use crate::runtime::DebugRuntime;
@@ -103,6 +103,7 @@ fn default_settings(session: &dyn DebugRuntime) -> RuntimeSettings {
         .map(|runtime| (runtime.watchdog_policy(), runtime.fault_policy()))
         .unwrap_or_else(|_| (WatchdogPolicy::default(), FaultPolicy::SafeHalt));
     RuntimeSettings::new(
+        Duration::from_millis(10),
         BaseSettings {
             log_level: SmolStr::new("info"),
             watchdog,
@@ -121,14 +122,19 @@ fn default_settings(session: &dyn DebugRuntime) -> RuntimeSettings {
             service_name: SmolStr::new("truST"),
             advertise: false,
             interfaces: Vec::new(),
+            host_group: None,
         },
         MeshSettings {
             enabled: false,
+            role: trust_runtime::config::MeshRole::Peer,
             listen: SmolStr::new("0.0.0.0:5200"),
+            connect: Vec::new(),
             tls: false,
             auth_token: None,
             publish: Vec::new(),
             subscribe: IndexMap::new(),
+            zenohd_version: SmolStr::new(trust_runtime::mesh::ZENOHD_BASELINE_VERSION),
+            plugin_versions: IndexMap::new(),
         },
         SimulationSettings {
             enabled: false,

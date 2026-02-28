@@ -100,7 +100,12 @@ export class TrustWasmAnalysisClient {
 
     this.restartCount += 1;
     this._terminateWorker();
-    this._resetReadyPromise();
+    // Keep the initial ready() promise alive during startup retries so callers
+    // waiting for first readiness do not get stuck on an orphaned promise.
+    // Only rotate the promise after readiness was already reached once.
+    if (this.readySettled) {
+      this._resetReadyPromise();
+    }
     this.emitStatus({
       type: "restarting",
       reason: cause.message,

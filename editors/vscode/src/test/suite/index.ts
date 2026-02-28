@@ -28,6 +28,7 @@ export function run(): Promise<void> {
   require("./statechart-editor.lifecycle.test");
   require("./statechart-engine.test");
   require("./statechart-runtime-client.test");
+  require("./runtime-shared-utils.test");
   require("./snippets.test");
   require("./st-tests.integration.test");
 

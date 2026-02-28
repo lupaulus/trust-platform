@@ -627,21 +627,21 @@ impl DebugAdapter {
                         };
                     }
                 };
-                let value =
-                    match self.evaluate_with_snapshot(&expr, &registry, frame_id, &snapshot, &using)
-                    {
-                        Ok(value) => value,
-                        Err(err) => {
-                            let message = match err {
-                                RuntimeError::InvalidFrame(_) => "unknown frame id".to_string(),
-                                _ => err.to_string(),
-                            };
-                            return DispatchOutcome {
-                                responses: vec![self.error_response(&request, &message)],
-                                ..DispatchOutcome::default()
-                            };
-                        }
-                    };
+                let value = match self
+                    .evaluate_with_snapshot(&expr, &registry, frame_id, &snapshot, &using)
+                {
+                    Ok(value) => value,
+                    Err(err) => {
+                        let message = match err {
+                            RuntimeError::InvalidFrame(_) => "unknown frame id".to_string(),
+                            _ => err.to_string(),
+                        };
+                        return DispatchOutcome {
+                            responses: vec![self.error_response(&request, &message)],
+                            ..DispatchOutcome::default()
+                        };
+                    }
+                };
                 let coerced = match coerce_value_to_type(value, type_id) {
                     Ok(value) => value,
                     Err(err) => {
@@ -682,21 +682,21 @@ impl DebugAdapter {
                         };
                     }
                 };
-                let value =
-                    match self.evaluate_with_snapshot(&expr, &registry, frame_id, &snapshot, &using)
-                    {
-                        Ok(value) => value,
-                        Err(err) => {
-                            let message = match err {
-                                RuntimeError::InvalidFrame(_) => "unknown frame id".to_string(),
-                                _ => err.to_string(),
-                            };
-                            return DispatchOutcome {
-                                responses: vec![self.error_response(&request, &message)],
-                                ..DispatchOutcome::default()
-                            };
-                        }
-                    };
+                let value = match self
+                    .evaluate_with_snapshot(&expr, &registry, frame_id, &snapshot, &using)
+                {
+                    Ok(value) => value,
+                    Err(err) => {
+                        let message = match err {
+                            RuntimeError::InvalidFrame(_) => "unknown frame id".to_string(),
+                            _ => err.to_string(),
+                        };
+                        return DispatchOutcome {
+                            responses: vec![self.error_response(&request, &message)],
+                            ..DispatchOutcome::default()
+                        };
+                    }
+                };
                 let coerced = match coerce_value_to_type(value, type_id) {
                     Ok(value) => value,
                     Err(err) => {

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=runtime_test_common.sh
+source "${SCRIPT_DIR}/runtime_test_common.sh"
+
 ST_RUNTIME="${ST_RUNTIME:-trust-runtime}"
 PROJECT="${1:-tests/fixtures/runtime_reliability_bundle}"
 DURATION_HOURS="${DURATION_HOURS:-24}"
@@ -8,6 +12,7 @@ DURATION_SECONDS="${DURATION_SECONDS:-}"
 INTERVAL_SEC="${INTERVAL_SEC:-60}"
 OUT="${OUT:-runtime-soak-$(date +%Y%m%d_%H%M%S).log}"
 BUILD_BEFORE_RUN="${BUILD_BEFORE_RUN:-true}"
+TEMP_SRC_LINK=""
 HMI_POLL_ENABLED="${HMI_POLL_ENABLED:-false}"
 HMI_BASE_URL="${HMI_BASE_URL:-http://127.0.0.1:18080}"
 HMI_TIMEOUT_SEC="${HMI_TIMEOUT_SEC:-5}"
@@ -20,6 +25,8 @@ if [ ! -f "$PROJECT/runtime.toml" ]; then
   echo "missing runtime.toml in project: $PROJECT"
   exit 1
 fi
+ST_RUNTIME="$(resolve_runtime_binary "$ST_RUNTIME")"
+TEMP_SRC_LINK="$(prepare_project_sources_link "$PROJECT")"
 if [ "$BUILD_BEFORE_RUN" = "true" ] || [ ! -f "$PROJECT/program.stbc" ]; then
   echo "Building project bytecode before soak test..."
   "$ST_RUNTIME" build --project "$PROJECT" >/dev/null
@@ -32,6 +39,7 @@ PID=$!
 cleanup() {
   "$ST_RUNTIME" ctl --project "$PROJECT" shutdown >/dev/null 2>&1 || true
   kill "$PID" >/dev/null 2>&1 || true
+  cleanup_project_sources_link "$TEMP_SRC_LINK"
 }
 trap cleanup EXIT
 
