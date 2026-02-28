@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Force byte-wise sort semantics so baseline ordering is stable across locales.
+export LC_ALL=C
+
 MODE="${1:---verify}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BASELINE_DIR="${ROOT_DIR}/tests/fixtures/mp001"
