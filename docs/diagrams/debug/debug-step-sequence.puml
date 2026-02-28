@@ -7,12 +7,12 @@ title Step Over Request Flow
 actor "VS Code" as vscode
 participant "DebugAdapter\ncore.rs" as adapter
 participant "DebugSession\nsession.rs" as session
-participant "DebugControl\ncontrol.rs" as control
-participant "Stop Thread\ncore.rs:199" as stopThread
+participant "DebugControl\napi.rs" as control
+participant "Stop Thread\ncore.rs" as stopThread
 participant "StopCoordinator\n(core.rs)" as stopCoord
-participant "Runner Thread\ncore.rs:489" as runner
+participant "Runner Thread\ncore.rs" as runner
 participant "Runtime\ncycle.rs" as runtime
-participant "DebugHook\ncontrol.rs:689" as hook
+participant "DebugHook\nhook.rs" as hook
 
 vscode -> adapter : next(threadId) (DAP request)
 activate adapter

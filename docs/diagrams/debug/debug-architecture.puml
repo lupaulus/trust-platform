@@ -13,10 +13,10 @@ title IEC 61131-3 ST Debug System Architecture
 ' VS CODE EXTENSION LAYER
 ' ============================================================
 package "VS Code Extension" as vscode #LightBlue {
-    component "DebugConfigurationProvider" as configProvider <<debug.ts:905>>
-    component "DebugAdapterDescriptorFactory" as adapterFactory <<debug.ts:876>>
-    component "DebugAdapterTrackerFactory" as tracker <<debug.ts:964>>
-    component "Runtime Panel\n(Webview)" as runtimePanel <<ioPanel.ts>>
+    component "DebugConfigurationProvider" as configProvider <<debug/configuration.ts>>
+    component "DebugAdapterDescriptorFactory" as adapterFactory <<debug.ts>>
+    component "DebugAdapterTrackerFactory" as tracker <<debug.ts>>
+    component "Runtime Panel\n(Webview)" as runtimePanel <<ioPanel.ts + io-panel/*>>
 
     configProvider --> adapterFactory : resolves config
     adapterFactory --> tracker : creates tracker
@@ -58,21 +58,21 @@ package "trust-debug crate" as stdebug #LightGreen {
     component "protocol_io.rs" as protocolIo <<read/write messages>>
 
     ' Session management
-    component "DebugSession" as session <<session.rs:68-78>> {
+    component "DebugSession" as session <<session.rs + session/*>> {
         portin sources
         portin breakpoints
         portin metadata
     }
 
     ' Debug Adapter
-    package "DebugAdapter" as adapter <<mod.rs:185-198>> {
-        component "run_stdio()" as runStdio <<core.rs:76>>
-        component "dispatch_request()" as dispatch <<core.rs:448>>
-        component "LaunchState" as launchState <<mod.rs:67-136>>
+    package "DebugAdapter" as adapter <<mod.rs + core.rs>> {
+        component "run_stdio()" as runStdio <<core.rs>>
+        component "dispatch_request()" as dispatch <<core.rs>>
+        component "LaunchState" as launchState <<mod.rs>>
         component "SessionMode\n(launch/attach)" as sessionMode
         component "RemoteSession\n(control client)" as remoteSession
         component "RemoteStopPoller" as remoteStop
-        component "VariableHandles" as varHandles <<mod.rs:38-52>>
+        component "VariableHandles" as varHandles <<mod.rs>>
         component "ThreadMapper" as threadMap <<threads.rs>>
         component "StopCoordinator" as stopCoord
         component "BreakpointManager" as bpManager
@@ -82,10 +82,10 @@ package "trust-debug crate" as stdebug #LightGreen {
 
     ' Background Threads
     package "Background Threads" as threads #PaleGreen {
-        component "Log Thread" as logThread <<core.rs:121>>
-        component "IO Thread" as ioThread <<core.rs:176>>
-        component "Stop Thread" as stopThread <<core.rs:199>>
-        component "Runner Thread" as runnerThread <<core.rs:489>>
+        component "Log Thread" as logThread <<core.rs>>
+        component "IO Thread" as ioThread <<core.rs>>
+        component "Stop Thread" as stopThread <<core.rs>>
+        component "Runner Thread" as runnerThread <<core.rs>>
     }
 
     ' Handlers
@@ -134,7 +134,7 @@ package "trust-debug crate" as stdebug #LightGreen {
 package "trust-runtime crate" as struntime #LightCoral {
 
     ' Debug Control Hub
-    package "DebugControl" as debugControl <<control.rs:146-150>> {
+    package "DebugControl" as debugControl <<debug/control/api.rs>> {
         component "DebugState" as debugState {
             portin mode
             portin breakpoints
@@ -145,19 +145,19 @@ package "trust-runtime crate" as struntime #LightCoral {
             portin breakpoint_generation
         }
         component "Mutex + Condvar" as sync
-        component "apply_action()" as applyAction <<control.rs:187-253>>
+        component "apply_action()" as applyAction <<api/lifecycle_actions.rs>>
         component "FrameLocationMap" as frameLocs
     }
 
     ' Debug Hook
     component "DebugHook trait" as debugHook <<hook.rs>>
-    component "on_statement_inner()" as onStatement <<control.rs:689-770>>
+    component "on_statement_inner()" as onStatement <<debug/control/hook.rs>>
 
     ' Breakpoint Logic
     component "matches_breakpoint()" as matchBp <<breakpoints.rs>>
 
     ' Snapshot
-    component "DebugSnapshot" as snapshot <<types.rs:104-111>> {
+    component "DebugSnapshot" as snapshot <<debug/control/types.rs>> {
         portin storage
         portin timestamp
     }
@@ -194,7 +194,7 @@ package "trust-runtime crate" as struntime #LightCoral {
 ' CONTROL SERVER (IPC)
 ' ============================================================
 package "ControlServer (IPC)" as controlServer #LightCoral {
-    component "control.rs" as controlCore
+    component "control/transport.rs" as controlCore
     component "debug.* endpoints" as debugEndpoints
     controlCore --> debugEndpoints
 }
@@ -387,9 +387,9 @@ legend right
 
     **Key Files:**
     • trust-debug/src/adapter/core.rs
-    • trust-debug/src/session.rs
-    • trust-runtime/src/debug/control.rs
-    • trust-runtime/src/debug/hook.rs
+    • trust-debug/src/session.rs + trust-debug/src/session/*
+    • trust-runtime/src/debug/control/api.rs
+    • trust-runtime/src/debug/control/hook.rs
 end legend
 
 @enduml

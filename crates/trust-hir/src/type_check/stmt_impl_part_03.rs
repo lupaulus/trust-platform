@@ -1,0 +1,228 @@
+impl<'a, 'b> StmtChecker<'a, 'b> {
+
+    fn check_case_branch(
+        &mut self,
+        node: &SyntaxNode,
+        selector_type: TypeId,
+        tracker: &mut CaseLabelTracker,
+    ) {
+        // Check that case labels are compatible with selector type
+        for child in node.children() {
+            match child.kind() {
+                SyntaxKind::CaseLabel => self.check_case_label(&child, selector_type, tracker),
+                SyntaxKind::Subrange => self.check_case_subrange(&child, selector_type, tracker),
+                _ if is_expression_kind(child.kind()) => {
+                    self.check_case_label_expr(&child, selector_type, tracker);
+                }
+                _ if is_statement_kind(child.kind()) => self.check_statement(&child),
+                _ => {}
+            }
+        }
+    }
+
+
+    fn check_case_label(
+        &mut self,
+        node: &SyntaxNode,
+        selector_type: TypeId,
+        tracker: &mut CaseLabelTracker,
+    ) {
+        if let Some(subrange) = node.children().find(|n| n.kind() == SyntaxKind::Subrange) {
+            self.check_case_subrange(&subrange, selector_type, tracker);
+            return;
+        }
+
+        if let Some(expr) = node.children().find(|n| is_expression_kind(n.kind())) {
+            self.check_case_label_expr(&expr, selector_type, tracker);
+        }
+    }
+
+
+    fn check_case_subrange(
+        &mut self,
+        node: &SyntaxNode,
+        selector_type: TypeId,
+        tracker: &mut CaseLabelTracker,
+    ) {
+        let mut bounds = Vec::new();
+        let mut has_label = false;
+        for child in node.children().filter(|n| is_expression_kind(n.kind())) {
+            has_label = true;
+            if !self.is_case_label_expr(&child) {
+                self.checker.diagnostics.error(
+                    DiagnosticCode::InvalidOperation,
+                    child.text_range(),
+                    "case label must be a literal, enum value, or constant",
+                );
+                continue;
+            }
+            let label_type = self.check_expression(&child);
+            if !self.checker.is_assignable(selector_type, label_type)
+                && !self
+                    .checker
+                    .is_contextual_int_literal(selector_type, &child)
+                && !self
+                    .checker
+                    .is_contextual_real_literal(selector_type, &child)
+            {
+                self.checker.diagnostics.error(
+                    DiagnosticCode::TypeMismatch,
+                    child.text_range(),
+                    "case label type must match selector type",
+                );
+            }
+            if let Some(value) = self.checker.eval_const_int_expr(&child) {
+                bounds.push(value);
+            }
+        }
+
+        match bounds.len() {
+            1 => self.record_case_label_value(tracker, bounds[0], node.text_range()),
+            2 => self.record_case_label_range(tracker, bounds[0], bounds[1], node.text_range()),
+            _ => {}
+        }
+
+        if !has_label && node.kind() == SyntaxKind::Subrange {
+            self.checker.diagnostics.error(
+                DiagnosticCode::TypeMismatch,
+                node.text_range(),
+                "case label type must match selector type",
+            );
+        }
+    }
+
+
+    fn check_case_label_expr(
+        &mut self,
+        expr: &SyntaxNode,
+        selector_type: TypeId,
+        tracker: &mut CaseLabelTracker,
+    ) {
+        if !self.is_case_label_expr(expr) {
+            self.checker.diagnostics.error(
+                DiagnosticCode::InvalidOperation,
+                expr.text_range(),
+                "case label must be a literal, enum value, or constant",
+            );
+            return;
+        }
+
+        let label_type = self.check_expression(expr);
+        if !self.checker.is_assignable(selector_type, label_type)
+            && !self.checker.is_contextual_int_literal(selector_type, expr)
+            && !self.checker.is_contextual_real_literal(selector_type, expr)
+        {
+            self.checker.diagnostics.error(
+                DiagnosticCode::TypeMismatch,
+                expr.text_range(),
+                "case label type must match selector type",
+            );
+        }
+
+        if let Some(value) = self.checker.eval_const_int_expr(expr) {
+            self.record_case_label_value(tracker, value, expr.text_range());
+        }
+    }
+
+
+    fn is_case_label_expr(&mut self, expr: &SyntaxNode) -> bool {
+        match expr.kind() {
+            SyntaxKind::Literal => true,
+            SyntaxKind::ParenExpr => expr
+                .children()
+                .find(|child| is_expression_kind(child.kind()))
+                .is_some_and(|child| self.is_case_label_expr(&child)),
+            SyntaxKind::UnaryExpr => {
+                let is_neg = expr
+                    .descendants_with_tokens()
+                    .filter_map(|e| e.into_token())
+                    .any(|token| token.kind() == SyntaxKind::Minus);
+                if !is_neg {
+                    return false;
+                }
+                expr.children()
+                    .find(|child| is_expression_kind(child.kind()))
+                    .is_some_and(|child| self.is_case_label_expr(&child))
+            }
+            SyntaxKind::NameRef => {
+                let Some(name) = self.checker.resolve_ref().get_name_from_ref(expr) else {
+                    return false;
+                };
+                let Some(symbol_id) = self
+                    .checker
+                    .symbols
+                    .resolve(&name, self.checker.current_scope)
+                else {
+                    return false;
+                };
+                let Some(symbol) = self.checker.symbols.get(symbol_id) else {
+                    return false;
+                };
+                matches!(
+                    symbol.kind,
+                    SymbolKind::Constant | SymbolKind::EnumValue { .. }
+                )
+            }
+            _ => false,
+        }
+    }
+
+
+    fn is_case_selector_type(&self, type_id: TypeId) -> bool {
+        let resolved = self.checker.resolve_alias_type(type_id);
+        matches!(
+            self.checker.symbols.type_by_id(resolved),
+            Some(
+                Type::Bool
+                    | Type::SInt
+                    | Type::Int
+                    | Type::DInt
+                    | Type::LInt
+                    | Type::USInt
+                    | Type::UInt
+                    | Type::UDInt
+                    | Type::ULInt
+                    | Type::Real
+                    | Type::LReal
+                    | Type::Byte
+                    | Type::Word
+                    | Type::DWord
+                    | Type::LWord
+                    | Type::Time
+                    | Type::LTime
+                    | Type::Date
+                    | Type::LDate
+                    | Type::Tod
+                    | Type::LTod
+                    | Type::Dt
+                    | Type::Ldt
+                    | Type::String { .. }
+                    | Type::WString { .. }
+                    | Type::Char
+                    | Type::WChar
+                    | Type::Enum { .. }
+                    | Type::Subrange { .. }
+                    | Type::Any
+                    | Type::AnyInt
+                    | Type::AnyReal
+                    | Type::AnyNum
+                    | Type::AnyBit
+                    | Type::AnyString
+                    | Type::AnyDate
+            )
+        )
+    }
+
+
+    fn case_labels_cover_enum(&self, selector_type: TypeId, tracker: &CaseLabelTracker) -> bool {
+        let resolved = self.checker.resolve_alias_type(selector_type);
+        let Some(Type::Enum { values, .. }) = self.checker.symbols.type_by_id(resolved) else {
+            return false;
+        };
+        if values.is_empty() {
+            return false;
+        }
+        values.iter().all(|(_, value)| tracker.covers(*value))
+    }
+
+}

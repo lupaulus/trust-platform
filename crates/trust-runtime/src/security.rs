@@ -4,9 +4,9 @@
 
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
-use rustls::{Certificate, PrivateKey};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
 use serde::{Deserialize, Serialize};
 
 use crate::config::{TlsConfig, TlsMode};
@@ -44,6 +44,19 @@ impl AccessRole {
     pub fn allows(self, required: Self) -> bool {
         self >= required
     }
+}
+
+/// Compare two secrets in constant time with respect to `expected` length.
+#[must_use]
+pub fn constant_time_eq(expected: &str, provided: &str) -> bool {
+    let expected_bytes = expected.as_bytes();
+    let provided_bytes = provided.as_bytes();
+    let mut diff = expected_bytes.len() ^ provided_bytes.len();
+    for (idx, expected_byte) in expected_bytes.iter().enumerate() {
+        let provided_byte = provided_bytes.get(idx).copied().unwrap_or_default();
+        diff |= (*expected_byte ^ provided_byte) as usize;
+    }
+    diff == 0
 }
 
 #[derive(Debug, Clone)]
@@ -119,10 +132,10 @@ pub fn load_tls_materials(
 pub fn rustls_server_config(
     materials: &TlsMaterials,
 ) -> Result<Arc<rustls::ServerConfig>, RuntimeError> {
+    ensure_rustls_crypto_provider()?;
     let certs = parse_pem_certs(&materials.certificate_pem, "tls certificate")?;
     let key = parse_pem_key(&materials.private_key_pem, "tls private key")?;
     let config = rustls::ServerConfig::builder()
-        .with_safe_defaults()
         .with_no_client_auth()
         .with_single_cert(certs, key)
         .map_err(|err| {
@@ -134,18 +147,34 @@ pub fn rustls_server_config(
 pub fn rustls_client_config(
     materials: &TlsMaterials,
 ) -> Result<Arc<rustls::ClientConfig>, RuntimeError> {
+    ensure_rustls_crypto_provider()?;
     let certs = parse_pem_certs(&materials.ca_pem, "tls ca certificate")?;
     let mut roots = rustls::RootCertStore::empty();
     for cert in certs {
-        roots.add(&cert).map_err(|err| {
+        roots.add(cert).map_err(|err| {
             RuntimeError::ControlError(format!("invalid tls ca certificate: {err}").into())
         })?;
     }
     let config = rustls::ClientConfig::builder()
-        .with_safe_defaults()
         .with_root_certificates(roots)
         .with_no_client_auth();
     Ok(Arc::new(config))
+}
+
+fn ensure_rustls_crypto_provider() -> Result<(), RuntimeError> {
+    static INSTALL_RESULT: OnceLock<Result<(), String>> = OnceLock::new();
+    let result = INSTALL_RESULT.get_or_init(|| {
+        if rustls::crypto::CryptoProvider::get_default().is_some() {
+            return Ok(());
+        }
+        rustls::crypto::aws_lc_rs::default_provider()
+            .install_default()
+            .map_err(|_| "install default rustls crypto provider (aws-lc-rs)".to_string())
+    });
+    result
+        .as_ref()
+        .map_err(|message| RuntimeError::ControlError(message.clone().into()))
+        .map(|_| ())
 }
 
 fn resolve_tls_path(path: &Path, project_root: Option<&Path>) -> Result<PathBuf, RuntimeError> {
@@ -158,13 +187,11 @@ fn resolve_tls_path(path: &Path, project_root: Option<&Path>) -> Result<PathBuf,
     Ok(root.join(path))
 }
 
-fn parse_pem_certs(pem: &[u8], label: &str) -> Result<Vec<Certificate>, RuntimeError> {
+fn parse_pem_certs(pem: &[u8], label: &str) -> Result<Vec<CertificateDer<'static>>, RuntimeError> {
     let mut reader = Cursor::new(pem);
     let certs = rustls_pemfile::certs(&mut reader)
-        .map_err(|err| RuntimeError::ControlError(format!("parse {label}: {err}").into()))?
-        .into_iter()
-        .map(Certificate)
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| RuntimeError::ControlError(format!("parse {label}: {err}").into()))?;
     if certs.is_empty() {
         return Err(RuntimeError::ControlError(
             format!("parse {label}: no certificates found").into(),
@@ -173,18 +200,12 @@ fn parse_pem_certs(pem: &[u8], label: &str) -> Result<Vec<Certificate>, RuntimeE
     Ok(certs)
 }
 
-fn parse_pem_key(pem: &[u8], label: &str) -> Result<PrivateKey, RuntimeError> {
+fn parse_pem_key(pem: &[u8], label: &str) -> Result<PrivateKeyDer<'static>, RuntimeError> {
     let mut reader = Cursor::new(pem);
-    let mut keys = rustls_pemfile::pkcs8_private_keys(&mut reader)
-        .map_err(|err| RuntimeError::ControlError(format!("parse {label}: {err}").into()))?;
-    if let Some(key) = keys.pop() {
-        return Ok(PrivateKey(key));
-    }
-    let mut reader = Cursor::new(pem);
-    let mut keys = rustls_pemfile::rsa_private_keys(&mut reader)
-        .map_err(|err| RuntimeError::ControlError(format!("parse {label}: {err}").into()))?;
-    if let Some(key) = keys.pop() {
-        return Ok(PrivateKey(key));
+    if let Some(key) = rustls_pemfile::private_key(&mut reader)
+        .map_err(|err| RuntimeError::ControlError(format!("parse {label}: {err}").into()))?
+    {
+        return Ok(key);
     }
     Err(RuntimeError::ControlError(
         format!("parse {label}: no supported private key found").into(),

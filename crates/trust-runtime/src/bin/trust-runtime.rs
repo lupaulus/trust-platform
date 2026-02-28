@@ -1,5 +1,7 @@
 //! CLI entrypoint for ST runtime.
 
+#[path = "trust-runtime/bench.rs"]
+mod bench;
 #[path = "trust-runtime/build.rs"]
 mod build;
 #[path = "trust-runtime/ci.rs"]
@@ -10,6 +12,8 @@ mod cli;
 mod commit;
 #[path = "trust-runtime/completions.rs"]
 mod completions;
+#[path = "trust-runtime/config_ui.rs"]
+mod config_ui;
 #[path = "trust-runtime/conformance.rs"]
 mod conformance;
 #[path = "trust-runtime/ctl.rs"]
@@ -197,6 +201,16 @@ fn run() -> anyhow::Result<()> {
             path,
             force,
         }),
+        Some(Command::Ide { action }) => match action {
+            cli::ConfigUiAction::Serve { project, listen } => {
+                config_ui::run_ide_serve(project, listen)
+            }
+        },
+        Some(Command::ConfigUi { action }) => match action {
+            cli::ConfigUiAction::Serve { project, listen } => {
+                config_ui::run_config_ui_serve(project, listen)
+            }
+        },
         Some(Command::Wizard { path, start }) => wizard::run_wizard(path, start),
         Some(Command::Commit {
             project,
@@ -222,6 +236,7 @@ fn run() -> anyhow::Result<()> {
         }
         Some(Command::Rollback { root }) => deploy::run_rollback(root),
         Some(Command::Completions { shell }) => completions::run_completions(shell),
+        Some(Command::Bench { action }) => bench::run_bench(action),
         Some(Command::Conformance {
             suite_root,
             output,
@@ -240,6 +255,8 @@ fn suggest_subcommand(input: &str) -> Option<&'static str> {
         "run",
         "play",
         "setup",
+        "ide",
+        "config-ui",
         "wizard",
         "ui",
         "ctl",
@@ -254,6 +271,7 @@ fn suggest_subcommand(input: &str) -> Option<&'static str> {
         "rollback",
         "commit",
         "completions",
+        "bench",
         "conformance",
     ];
     let mut best = None;

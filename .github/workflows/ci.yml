@@ -186,12 +186,38 @@ jobs:
           diff -u \
             gate-artifacts/conformance-pass-1.normalized.json \
             gate-artifacts/conformance-pass-2.normalized.json
+      - name: Enforce runtime comms fuzz smoke budget gate
+        run: |
+          OUT_DIR=gate-artifacts/runtime-comms-fuzz \
+          TRUST_COMMS_FUZZ_ITERS=512 \
+          ./scripts/runtime_comms_fuzz_gate.sh
+      - name: Enforce runtime comms benchmark threshold gate
+        run: |
+          OUT_DIR=gate-artifacts/runtime-comms-bench \
+          TRUST_COMMS_BENCH_SAMPLES=256 \
+          ./scripts/runtime_comms_bench_gate.sh
+      - name: Enforce runtime cloud security profile evidence gate
+        run: |
+          OUT_DIR=gate-artifacts/runtime-cloud-security-profiles \
+          ./scripts/runtime_cloud_security_profile_gate.sh
+      - name: Enforce Zenoh baseline version gate
+        run: |
+          ./scripts/check_zenoh_baseline.sh
+      - name: Enforce runtime comms conformance matrix gate
+        run: |
+          OUT_DIR=gate-artifacts/runtime-comms-conformance \
+          ./scripts/runtime_comms_conformance_gate.sh
       - name: Upload conformance artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: conformance-suite
-          path: gate-artifacts/conformance-pass-*.json
+          path: |
+            gate-artifacts/conformance-pass-*.json
+            gate-artifacts/runtime-comms-fuzz/**
+            gate-artifacts/runtime-comms-bench/**
+            gate-artifacts/runtime-cloud-security-profiles/**
+            gate-artifacts/runtime-comms-conformance/**
       - name: Mark gate success
         if: ${{ success() }}
         run: |

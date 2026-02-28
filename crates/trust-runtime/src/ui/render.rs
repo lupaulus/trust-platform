@@ -1,5 +1,7 @@
 use super::*;
 
+mod panels;
+
 pub(super) fn render_ui(
     area: Rect,
     frame: &mut ratatui::Frame<'_>,
@@ -38,7 +40,7 @@ pub(super) fn render_ui(
 
 pub(super) fn render_panels(area: Rect, frame: &mut ratatui::Frame<'_>, state: &UiState) {
     if let Some(panel) = state.focus {
-        render_panel(area, frame, state, panel, true);
+        panels::render_panel(area, frame, state, panel, true);
         return;
     }
     let width = area.width;
@@ -56,10 +58,10 @@ pub(super) fn render_panels(area: Rect, frame: &mut ratatui::Frame<'_>, state: &
             .direction(Direction::Vertical)
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(cols[1]);
-        render_panel(left[0], frame, state, panels[0], false);
-        render_panel(right[0], frame, state, panels[1], false);
-        render_panel(left[1], frame, state, panels[2], false);
-        render_panel(right[1], frame, state, panels[3], false);
+        panels::render_panel(left[0], frame, state, panels[0], false);
+        panels::render_panel(right[0], frame, state, panels[1], false);
+        panels::render_panel(left[1], frame, state, panels[2], false);
+        panels::render_panel(right[1], frame, state, panels[3], false);
         return;
     }
 
@@ -72,10 +74,10 @@ pub(super) fn render_panels(area: Rect, frame: &mut ratatui::Frame<'_>, state: &
             .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(area);
         if let Some(panel) = panels.get(start) {
-            render_panel(stack[0], frame, state, *panel, false);
+            panels::render_panel(stack[0], frame, state, *panel, false);
         }
         if let Some(panel) = panels.get(start + 1) {
-            render_panel(stack[1], frame, state, *panel, false);
+            panels::render_panel(stack[1], frame, state, *panel, false);
         }
         return;
     }
@@ -84,5 +86,74 @@ pub(super) fn render_panels(area: Rect, frame: &mut ratatui::Frame<'_>, state: &
         .get(state.panel_page % panels.len().max(1))
         .copied()
         .unwrap_or(PanelKind::Status);
-    render_panel(area, frame, state, panel, false);
+    panels::render_panel(area, frame, state, panel, false);
+}
+
+pub(super) fn render_prompt(
+    area: Rect,
+    frame: &mut ratatui::Frame<'_>,
+    state: &UiState,
+    no_input: bool,
+) {
+    let mut lines: Vec<Line> = Vec::new();
+    for alert in state.alerts.iter().take(3) {
+        lines.push(prompt_line_to_line(alert));
+    }
+    for line in state.prompt.output.iter() {
+        lines.push(prompt_line_to_line(line));
+    }
+    let output_height = area.height.saturating_sub(1);
+    let output_area = Rect {
+        x: area.x,
+        y: area.y,
+        width: area.width,
+        height: output_height,
+    };
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }), output_area);
+
+    let prompt_area = Rect {
+        x: area.x,
+        y: area.y + output_height,
+        width: area.width,
+        height: 1,
+    };
+    if no_input {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "Read-only mode",
+                Style::default().fg(COLOR_INFO),
+            ))),
+            prompt_area,
+        );
+        return;
+    }
+    if state.prompt.active {
+        let prompt = Line::from(vec![
+            Span::styled(
+                "> ",
+                Style::default().fg(COLOR_TEAL).add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(state.prompt.input.clone()),
+        ]);
+        frame.render_widget(
+            Paragraph::new(prompt).style(Style::default().bg(COLOR_PROMPT_BG)),
+            prompt_area,
+        );
+        frame.set_cursor_position((
+            prompt_area.x + 2 + state.prompt.cursor as u16,
+            prompt_area.y,
+        ));
+    } else {
+        let hint = Line::from(Span::styled(
+            "Press / to type command",
+            Style::default()
+                .fg(COLOR_INFO)
+                .add_modifier(Modifier::DIM)
+                .bg(COLOR_PROMPT_BG),
+        ));
+        frame.render_widget(
+            Paragraph::new(hint).style(Style::default().bg(COLOR_PROMPT_BG)),
+            prompt_area,
+        );
+    }
 }

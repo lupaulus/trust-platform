@@ -15,13 +15,16 @@ The `/ide` surface is the runtime-hosted browser IDE for real project work:
 
 ## Start the Web IDE
 
-1. Start runtime web UI:
+1. Standalone IDE mode (no runtime cycle):
+   `trust-runtime ide serve --project /path/to/project --listen 127.0.0.1:18080`
+2. Runtime-hosted mode:
    `trust-runtime run --web --project /path/to/project`
-2. Open:
+3. Open:
    `http://127.0.0.1:18080/ide`
 
-If runtime starts without an active project bundle, use the IDE project-open UI
-to select the target project root.
+Notes:
+- `trust-runtime config-ui serve ...` is still accepted as a deprecated alias for `ide serve`.
+- If startup has no active project, use the IDE "Open Folder" flow to select a workspace root.
 
 ## Core API Surface
 

@@ -1,5 +1,82 @@
 use super::*;
 
+pub(super) enum ControlStream {
+    Tcp(std::net::TcpStream),
+    #[cfg(unix)]
+    Unix(std::os::unix::net::UnixStream),
+}
+
+impl Read for ControlStream {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self {
+            ControlStream::Tcp(stream) => stream.read(buf),
+            #[cfg(unix)]
+            ControlStream::Unix(stream) => stream.read(buf),
+        }
+    }
+}
+
+impl Write for ControlStream {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            ControlStream::Tcp(stream) => stream.write(buf),
+            #[cfg(unix)]
+            ControlStream::Unix(stream) => stream.write(buf),
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        match self {
+            ControlStream::Tcp(stream) => stream.flush(),
+            #[cfg(unix)]
+            ControlStream::Unix(stream) => stream.flush(),
+        }
+    }
+}
+
+pub(super) struct ControlClient {
+    pub(super) token: Option<String>,
+    pub(super) reader: io::BufReader<ControlStream>,
+}
+
+impl ControlClient {
+    pub(super) fn connect(
+        endpoint: ControlEndpoint,
+        token: Option<String>,
+    ) -> anyhow::Result<Self> {
+        let stream = match &endpoint {
+            ControlEndpoint::Tcp(addr) => ControlStream::Tcp(std::net::TcpStream::connect(addr)?),
+            #[cfg(unix)]
+            ControlEndpoint::Unix(path) => {
+                ControlStream::Unix(std::os::unix::net::UnixStream::connect(path)?)
+            }
+        };
+        Ok(Self {
+            token,
+            reader: io::BufReader::new(stream),
+        })
+    }
+
+    pub(super) fn request(
+        &mut self,
+        mut payload: serde_json::Value,
+    ) -> anyhow::Result<serde_json::Value> {
+        if let Some(token) = self.token.as_deref() {
+            payload["auth"] = json!(token);
+        }
+        let line = serde_json::to_string(&payload)?;
+        {
+            let stream = self.reader.get_mut();
+            stream.write_all(line.as_bytes())?;
+            stream.write_all(b"\n")?;
+            stream.flush()?;
+        }
+        let mut response = String::new();
+        self.reader.read_line(&mut response)?;
+        Ok(serde_json::from_str(&response)?)
+    }
+}
+
 pub(super) fn resolve_endpoint(
     bundle: Option<PathBuf>,
     endpoint: Option<String>,

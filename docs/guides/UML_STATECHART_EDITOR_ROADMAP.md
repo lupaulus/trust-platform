@@ -503,7 +503,7 @@ Build time:                       ~63ms
 - [XState Documentation](https://xstate.js.org/docs/) - JSON format inspiration
 
 ### Example VSCode Webviews
-- `editors/vscode/src/hmiPanel.ts` - Reference implementation
+- `editors/vscode/src/hmiPanel.ts`, `editors/vscode/src/hmi-panel/view.ts` - Reference implementation
 - `editors/vscode/media/` - Asset management
 
 ---

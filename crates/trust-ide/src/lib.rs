@@ -36,6 +36,8 @@ pub mod selection_range;
 pub mod semantic_tokens;
 pub mod signature_help;
 pub mod stdlib_docs;
+/// Shared source text-range helpers.
+pub mod text_range;
 pub mod type_hierarchy;
 pub mod util;
 /// Shared helpers for VAR/CONSTANT declaration inspection.

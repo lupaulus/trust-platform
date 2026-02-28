@@ -36,6 +36,7 @@ code /path/to/trust-platform
 | Communication protocols (grouped) | `examples/communication/README.md` | protocol-focused examples for Modbus/TCP, MQTT, OPC UA, two EtherCAT commissioning profiles (mock-first + field-tested), GPIO, and composed multi-driver configurations with transport gates and commissioning flow | 120-220 min |
 | Runtime I/O mental model | `examples/memory_marker_counter/README.md` | `%M/%Q` cycle semantics + debugger confirmation | 20-30 min |
 | HMI P&ID tutorial | `examples/tutorials/12_hmi_pid_process_dashboard/README.md` | process SVG pages, bypass mode, setpoint/alarm bindings, and live HMI refresh workflow | 35-55 min |
+| Runtime cloud onboarding pack | `examples/runtime_cloud/README.md` | profile setup (`dev`/`plant`/`wan`), preflight/dispatch payloads, federation allowlist flow | 30-60 min |
 | Multi-file architecture | `examples/plant_demo/README.md` | type/FB/program/config layering + cross-file refactors | 25-40 min |
 | Process-control capstone | `examples/filling_line/README.md` | hysteresis control, interface hierarchy, hot reload | 35-55 min |
 | EtherCAT bring-up (DI+DO) | `examples/ethercat_ek1100_elx008_v1/README.md` | `io.toml`, mock-first validation, hardware handoff | 30-50 min |
@@ -60,11 +61,12 @@ code /path/to/trust-platform
 11. `examples/tutorials/14_deploy_and_rollback/README.md`
 12. `examples/tutorials/16_secure_remote_access/README.md`
 13. `examples/tutorials/15_multi_plc_discovery_mesh/README.md`
-14. `examples/tutorials/20_hmi_write_enablement/README.md`
-15. `examples/tutorials/21_ci_cd_project_pipeline/README.md`
-16. `examples/tutorials/22_neovim_zed_workflow/README.md`
-17. `examples/tutorials/23_observability_historian_prometheus/README.md`
-18. Choose specialization:
+14. `examples/runtime_cloud/README.md`
+15. `examples/tutorials/20_hmi_write_enablement/README.md`
+16. `examples/tutorials/21_ci_cd_project_pipeline/README.md`
+17. `examples/tutorials/22_neovim_zed_workflow/README.md`
+18. `examples/tutorials/23_observability_historian_prometheus/README.md`
+19. Choose specialization:
    - Interop: `examples/plcopen_xml_st_complete/README.md`
    - Vendor profiles: `examples/siemens_scl_v1/README.md`, `examples/mitsubishi_gxworks3_v1/README.md`
    - Fieldbus backend: `examples/ethercat_ek1100_elx008_v1/README.md`, `examples/ethercat_ek1100_elx008_v2/README.md`

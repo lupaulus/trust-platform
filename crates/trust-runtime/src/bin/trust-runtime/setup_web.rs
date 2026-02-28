@@ -55,9 +55,120 @@ struct SetupDefaultsResponse {
     needs_setup: bool,
 }
 
-const INDEX_HTML: &str = include_str!("../../web/ui/index.html");
-const APP_JS: &str = include_str!("../../web/ui/app.js");
-const APP_CSS: &str = include_str!("../../web/ui/styles.css");
+const SETUP_HTML: &str = r#"<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>truST Setup</title>
+  <link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+  <main class="setup-wrap">
+    <h1>truST Setup</h1>
+    <p class="muted">Initialize runtime.toml and io.toml for this project.</p>
+    <form id="setupForm" class="setup-form">
+      <label>Project Path <input id="projectPath" type="text"/></label>
+      <label>Resource Name <input id="resourceName" type="text"/></label>
+      <label>Cycle (ms) <input id="cycleMs" type="number" min="1"/></label>
+      <label>Driver <input id="driver" type="text"/></label>
+      <label class="row"><input id="useSystemIo" type="checkbox"/> Use system I/O config</label>
+      <label class="row"><input id="writeSystemIo" type="checkbox"/> Write system I/O config</label>
+      <label class="row"><input id="overwriteSystemIo" type="checkbox"/> Overwrite existing system I/O config</label>
+      <div class="actions">
+        <button id="applyBtn" type="submit">Apply Setup</button>
+      </div>
+    </form>
+    <pre id="status" class="status">Loading setup defaults...</pre>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>
+"#;
+
+const SETUP_JS: &str = r#"(() => {
+  const qs = window.location.search || "";
+  const withQuery = (path) => `${path}${qs}`;
+  const $ = (id) => document.getElementById(id);
+  const statusEl = $("status");
+  const form = $("setupForm");
+
+  const setStatus = (text) => {
+    if (statusEl) statusEl.textContent = String(text || "");
+  };
+
+  async function fetchDefaults() {
+    const response = await fetch(withQuery("/api/setup/defaults"));
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(body || `defaults failed (${response.status})`);
+    }
+    return response.json();
+  }
+
+  function applyDefaults(defaults) {
+    $("projectPath").value = defaults.project_path || "";
+    $("resourceName").value = defaults.resource_name || "";
+    $("cycleMs").value = String(defaults.cycle_ms || 100);
+    $("driver").value = defaults.driver || "loopback";
+    $("useSystemIo").checked = Boolean(defaults.use_system_io);
+    $("writeSystemIo").checked = Boolean(defaults.write_system_io);
+    $("overwriteSystemIo").checked = Boolean(defaults.system_io_exists);
+  }
+
+  async function submitSetup(event) {
+    event.preventDefault();
+    const payload = {
+      project_path: $("projectPath").value.trim(),
+      resource_name: $("resourceName").value.trim(),
+      cycle_ms: Number($("cycleMs").value || 100),
+      driver: $("driver").value.trim(),
+      use_system_io: $("useSystemIo").checked,
+      write_system_io: $("writeSystemIo").checked,
+      overwrite_system_io: $("overwriteSystemIo").checked,
+    };
+    setStatus("Applying setup...");
+    const response = await fetch(withQuery("/api/setup/apply"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const body = await response.text();
+    if (!response.ok || body.startsWith("error:")) {
+      throw new Error(body || `apply failed (${response.status})`);
+    }
+    setStatus(body || "Setup applied.");
+  }
+
+  form?.addEventListener("submit", (event) => {
+    submitSetup(event).catch((error) => setStatus(`error: ${error.message || error}`));
+  });
+
+  fetchDefaults()
+    .then((defaults) => {
+      applyDefaults(defaults || {});
+      setStatus("Ready.");
+    })
+    .catch((error) => {
+      setStatus(`error: ${error.message || error}`);
+    });
+})();
+"#;
+
+const SETUP_CSS: &str = r#"
+:root { color-scheme: light dark; font-family: "Sora", sans-serif; }
+body { margin: 0; background: #0b1220; color: #e2e8f0; }
+.setup-wrap { max-width: 840px; margin: 24px auto; padding: 20px; background: #111827; border: 1px solid #334155; border-radius: 12px; }
+h1 { margin: 0 0 8px; font-size: 24px; }
+.muted { color: #94a3b8; margin: 0 0 16px; }
+.setup-form { display: grid; gap: 12px; }
+label { display: grid; gap: 6px; font-size: 13px; color: #cbd5e1; }
+input[type="text"], input[type="number"] { padding: 9px 10px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: #f8fafc; }
+.row { display: flex; align-items: center; gap: 8px; }
+.actions { display: flex; justify-content: flex-end; }
+button { padding: 10px 14px; border-radius: 8px; border: 1px solid #0f766e; background: #0d9488; color: #f0fdfa; cursor: pointer; font-weight: 600; }
+.status { margin: 16px 0 0; padding: 10px; min-height: 48px; border-radius: 8px; background: #020617; border: 1px solid #334155; color: #bae6fd; white-space: pre-wrap; }
+"#;
 
 pub fn run_setup_web(options: SetupWebOptions) -> anyhow::Result<()> {
     let listen = format!("{}:{}", options.bind, options.port);
@@ -87,19 +198,19 @@ pub fn run_setup_web(options: SetupWebOptions) -> anyhow::Result<()> {
                 let _ = request.respond(response);
                 continue;
             }
-            let response = Response::from_string(INDEX_HTML)
+            let response = Response::from_string(SETUP_HTML)
                 .with_header(Header::from_bytes("Content-Type", "text/html").unwrap());
             let _ = request.respond(response);
             continue;
         }
         if method == Method::Get && path == "/styles.css" {
-            let response = Response::from_string(APP_CSS)
+            let response = Response::from_string(SETUP_CSS)
                 .with_header(Header::from_bytes("Content-Type", "text/css").unwrap());
             let _ = request.respond(response);
             continue;
         }
         if method == Method::Get && path == "/app.js" {
-            let response = Response::from_string(APP_JS)
+            let response = Response::from_string(SETUP_JS)
                 .with_header(Header::from_bytes("Content-Type", "application/javascript").unwrap());
             let _ = request.respond(response);
             continue;
@@ -321,9 +432,10 @@ fn print_setup_urls(state: &Arc<Mutex<SetupState>>) {
 }
 
 fn generate_token() -> String {
-    use rand::RngCore;
+    use rand::TryRng;
     let mut buf = [0u8; 16];
-    rand::rngs::OsRng.fill_bytes(&mut buf);
+    let mut rng = rand::rngs::SysRng;
+    let _ = rng.try_fill_bytes(&mut buf);
     buf.iter().map(|b| format!("{b:02x}")).collect::<String>()
 }
 

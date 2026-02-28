@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=runtime_test_common.sh
+source "${SCRIPT_DIR}/runtime_test_common.sh"
+
 ST_RUNTIME="${ST_RUNTIME:-trust-runtime}"
 PROJECT="${1:-tests/fixtures/runtime_reliability_bundle}"
 DURATION="${DURATION:-30}"
 INTERVAL="${INTERVAL:-1}"
 OUT="${OUT:-runtime-load-$(date +%Y%m%d_%H%M%S).log}"
 BUILD_BEFORE_RUN="${BUILD_BEFORE_RUN:-true}"
+TEMP_SRC_LINK=""
 
 if [ ! -d "$PROJECT" ]; then
   echo "project folder not found: $PROJECT"
@@ -16,6 +21,8 @@ if [ ! -f "$PROJECT/runtime.toml" ]; then
   echo "missing runtime.toml in project: $PROJECT"
   exit 1
 fi
+ST_RUNTIME="$(resolve_runtime_binary "$ST_RUNTIME")"
+TEMP_SRC_LINK="$(prepare_project_sources_link "$PROJECT")"
 if [ "$BUILD_BEFORE_RUN" = "true" ] || [ ! -f "$PROJECT/program.stbc" ]; then
   echo "Building project bytecode before load test..."
   "$ST_RUNTIME" build --project "$PROJECT" >/dev/null
@@ -28,6 +35,7 @@ PID=$!
 cleanup() {
   "$ST_RUNTIME" ctl --project "$PROJECT" shutdown >/dev/null 2>&1 || true
   kill "$PID" >/dev/null 2>&1 || true
+  cleanup_project_sources_link "$TEMP_SRC_LINK"
 }
 trap cleanup EXIT
 

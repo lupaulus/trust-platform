@@ -12,8 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use rand::rngs::OsRng;
-use rand::RngCore;
+use rand::TryRng;
 use serde::{Deserialize, Serialize};
 
 use crate::security::AccessRole;
@@ -244,14 +243,16 @@ impl PairingStore {
 
 fn generate_code() -> String {
     let mut buf = [0u8; 4];
-    OsRng.fill_bytes(&mut buf);
+    let mut rng = rand::rngs::SysRng;
+    let _ = rng.try_fill_bytes(&mut buf);
     let value = u32::from_le_bytes(buf) % 1_000_000;
     format!("{value:06}")
 }
 
 fn generate_token() -> String {
     let mut buf = [0u8; TOKEN_BYTES];
-    OsRng.fill_bytes(&mut buf);
+    let mut rng = rand::rngs::SysRng;
+    let _ = rng.try_fill_bytes(&mut buf);
     URL_SAFE_NO_PAD.encode(buf)
 }
 

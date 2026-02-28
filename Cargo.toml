@@ -11,7 +11,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.9.15"
+version = "0.9.20"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/johannesPettersson80/trust-platform"
@@ -22,8 +22,8 @@ categories = ["development-tools", "text-editors"]
 
 [workspace.dependencies]
 # Syntax
-logos = "0.14"
-rowan = "0.15"
+logos = "0.16"
+rowan = "0.16"
 text-size = "1.1"
 
 # Semantic analysis
@@ -31,7 +31,7 @@ salsa = "0.26"
 
 # LSP
 tower-lsp = "0.20"
-lsp-types = "0.95"
+lsp-types = "0.97"
 
 # Async runtime
 tokio = { version = "1", features = ["full"] }
@@ -39,41 +39,41 @@ tokio = { version = "1", features = ["full"] }
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.8"
+toml = "1.0"
 clap = { version = "4", features = ["derive"] }
 clap_complete = "4"
 qrcode = "0.14"
 urlencoding = "2"
 percent-encoding = "2"
-roxmltree = "0.20"
+roxmltree = "0.21"
 wasm-bindgen = "0.2"
 
 # Error handling
-thiserror = "1"
+thiserror = "2"
 anyhow = "1"
 
 # Testing
-expect-test = "1.4"
+expect-test = "1.5"
 insta = { version = "1", features = ["glob"] }
 
 # Utilities
-smol_str = "0.2"
-rustc-hash = "1.1"
+smol_str = "0.3"
+rustc-hash = "2.1"
 indexmap = "2"
 drop_bomb = "0.1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-once_cell = "1.19"
+once_cell = "1.21"
 parking_lot = "0.12"
 crossbeam-channel = "0.5"
 glob = "0.3"
 crc32fast = "1"
-ratatui = "0.26"
-crossterm = "0.27"
-dialoguer = "0.11"
-indicatif = "0.17"
+ratatui = "0.29"
+crossterm = "0.29"
+dialoguer = "0.12"
+indicatif = "0.18"
 owo-colors = "4"
-rumqttc = "0.24"
+rumqttc = "0.25"
 
 # Internal crates
 trust-syntax = { path = "crates/trust-syntax" }
@@ -92,6 +92,14 @@ pedantic = "warn"
 [profile.release]
 lto = true
 codegen-units = 1
+
+[profile.dev]
+debug = 1
+incremental = true
+
+[profile.test]
+debug = 1
+incremental = true
 
 [profile.dev.package.insta]
 opt-level = 3
