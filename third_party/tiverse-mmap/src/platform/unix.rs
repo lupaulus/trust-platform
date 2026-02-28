@@ -296,7 +296,7 @@ impl PlatformMmap {
         _huge_page_size: HugePageSize,
     ) -> Result<Self> {
         // Fallback: try regular mmap with MADV_HUGEPAGE hint
-        let mmap = Self::new(file, offset, len, protection)?;
+        let mmap = Self::new(file, offset, len, protection, MappingMode::Shared)?;
 
         #[cfg(target_os = "macos")]
         {
