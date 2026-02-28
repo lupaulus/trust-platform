@@ -12,7 +12,7 @@ search_with_line_numbers() {
   if command -v rg >/dev/null 2>&1; then
     rg -n "$pattern" "$@"
   else
-    grep -nE "$pattern" "$@"
+    grep -R -nE "$pattern" "$@"
   fi
 }
 
