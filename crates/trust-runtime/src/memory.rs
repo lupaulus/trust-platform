@@ -139,6 +139,11 @@ impl VariableStorage {
         self.frames.pop()
     }
 
+    pub fn remove_frame(&mut self, frame_id: FrameId) -> Option<LocalFrame> {
+        let idx = self.frames.iter().position(|frame| frame.id == frame_id)?;
+        Some(self.frames.remove(idx))
+    }
+
     #[must_use]
     pub fn frames(&self) -> &[LocalFrame] {
         &self.frames

@@ -65,12 +65,21 @@ fn validate_pou_index(
                 "POU code out of bounds".into(),
             ));
         }
-        validate_instruction_stream(index, types, const_pool, ref_table, start, &bodies[start..end])?;
+        validate_instruction_stream(
+            strings,
+            index,
+            types,
+            const_pool,
+            ref_table,
+            start,
+            &bodies[start..end],
+        )?;
     }
     Ok(())
 }
 
 fn validate_instruction_stream(
+    strings: &StringTable,
     index: &PouIndex,
     types: &TypeTable,
     const_pool: &ConstPool,
@@ -123,6 +132,27 @@ fn validate_instruction_stream(
                             "CALL_VIRTUAL slot out of range".into(),
                         ));
                     }
+                }
+            }
+            0x09 => {
+                let kind = reader.read_u32()?;
+                let symbol_idx = reader.read_u32()?;
+                let arg_count = reader.read_u32()?;
+                if kind > 3 {
+                    return Err(BytecodeError::InvalidSection(
+                        "CALL_NATIVE kind out of range".into(),
+                    ));
+                }
+                if symbol_idx as usize >= strings.entries.len() {
+                    return Err(BytecodeError::InvalidIndex {
+                        kind: "native symbol".into(),
+                        index: symbol_idx,
+                    });
+                }
+                if arg_count > 1024 {
+                    return Err(BytecodeError::InvalidSection(
+                        "CALL_NATIVE arg_count out of range".into(),
+                    ));
                 }
             }
             0x10 => {

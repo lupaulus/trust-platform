@@ -199,6 +199,33 @@ fn vm_opcode_positive_path_covers_arith_logical_branch_jump_load_store_ref() {
 }
 
 #[test]
+fn vm_opcode_positive_path_covers_call_native_stdlib_dispatch() {
+    let source = r#"
+        PROGRAM Main
+        VAR
+            out_sel : INT := 0;
+        END_VAR
+        out_sel := SEL(G := TRUE, IN0 := INT#4, IN1 := INT#7);
+        END_PROGRAM
+    "#;
+    let module = bytecode_module_from_source(source).expect("compile bytecode module");
+    let body = main_body_bytes(&module);
+    assert!(
+        body.contains(&0x09),
+        "expected CALL_NATIVE opcode in main body"
+    );
+
+    let mut harness = vm_harness(source);
+    let cycle = harness.cycle();
+    assert!(
+        cycle.errors.is_empty(),
+        "CALL_NATIVE stdlib dispatch failed: {:?}",
+        cycle.errors
+    );
+    harness.assert_eq("out_sel", 7i16);
+}
+
+#[test]
 fn vm_enforces_execution_deadline() {
     let source = r#"
         PROGRAM Main
@@ -219,6 +246,28 @@ fn vm_enforces_execution_deadline() {
         "expected ExecutionTimeout, got {:?}",
         cycle.errors
     );
+}
+
+#[test]
+fn vm_rejects_invalid_call_native_symbol_index() {
+    let source = r#"
+        PROGRAM Main
+        VAR
+            keep : INT := 0;
+        END_VAR
+        keep := keep + INT#1;
+        END_PROGRAM
+    "#;
+    let mut module = bytecode_module_from_source(source).expect("compile module");
+    let mut body = Vec::new();
+    body.push(0x09);
+    body.extend_from_slice(&0_u32.to_le_bytes());
+    body.extend_from_slice(&255_u32.to_le_bytes());
+    body.extend_from_slice(&0_u32.to_le_bytes());
+    body.push(0x06);
+    replace_main_body(&mut module, &body);
+
+    assert_apply_invalid_bytecode_contains(&module, "invalid index 255 for native symbol");
 }
 
 #[test]

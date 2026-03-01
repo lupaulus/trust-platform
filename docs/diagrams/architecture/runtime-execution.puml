@@ -60,7 +60,7 @@ package "Execution Backend Boundary" as backendPkg #LightYellow {
     package "Bytecode VM Core\n(runtime/vm/*)" as vmCore #LightCyan {
         component "dispatch.rs\n(PC loop + op dispatch)" as vmDispatch
         component "stack.rs\n(operand stack invariants)" as vmStack
-        component "frames.rs + call.rs\n(frame/call stack)" as vmFrames
+        component "frames.rs + call.rs\n(frame stack + CALL_NATIVE dispatch bridge)" as vmFrames
         component "errors.rs\n(trap -> RuntimeError)" as vmErrors
         component "debug_map.rs\n(symbol/source mappings)" as vmDebugMap
     }

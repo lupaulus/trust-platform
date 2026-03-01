@@ -49,6 +49,7 @@ pub(super) fn execute_function_block_ref(
 #[derive(Debug, Clone)]
 pub(super) struct VmModule {
     pub(super) code: Vec<u8>,
+    pub(super) strings: Vec<SmolStr>,
     pub(super) refs: Vec<VmRef>,
     pub(super) consts: Vec<Value>,
     pub(super) pou_by_id: HashMap<u32, VmPouEntry>,
@@ -147,6 +148,7 @@ impl VmModule {
 
         Ok(Self {
             code: bodies.clone(),
+            strings: strings.entries.clone(),
             refs,
             consts,
             pou_by_id,
@@ -216,6 +218,7 @@ pub(super) fn opcode_operand_len(opcode: u8) -> Option<usize> {
         | 0x50..=0x55 => Some(0),
         0x02..=0x05 | 0x07 | 0x10 | 0x20..=0x22 | 0x30 | 0x60 | 0x70 => Some(4),
         0x08 => Some(8),
+        0x09 => Some(12),
         0x16 => Some(1),
         _ => None,
     }

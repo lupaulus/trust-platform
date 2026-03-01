@@ -138,6 +138,9 @@ impl<'a> BytecodeEncoder<'a> {
                 code.push(opcode);
                 Ok(true)
             }
+            crate::eval::expr::Expr::Call { target, args } => {
+                self.emit_call_expr(ctx, target, args, code)
+            }
             _ => Ok(false),
         };
         match result {
@@ -151,5 +154,132 @@ impl<'a> BytecodeEncoder<'a> {
                 Err(err)
             }
         }
+    }
+
+    fn emit_call_expr(
+        &mut self,
+        ctx: &CodegenContext,
+        target: &crate::eval::expr::Expr,
+        args: &[crate::eval::CallArg],
+        code: &mut Vec<u8>,
+    ) -> Result<bool, BytecodeError> {
+        #[derive(Clone, Copy)]
+        enum NativeTargetKind {
+            Function,
+            FunctionBlock,
+            Method,
+            Stdlib,
+        }
+
+        fn native_kind_value(kind: NativeTargetKind) -> u32 {
+            match kind {
+                NativeTargetKind::Function => crate::bytecode::NATIVE_CALL_KIND_FUNCTION,
+                NativeTargetKind::FunctionBlock => crate::bytecode::NATIVE_CALL_KIND_FUNCTION_BLOCK,
+                NativeTargetKind::Method => crate::bytecode::NATIVE_CALL_KIND_METHOD,
+                NativeTargetKind::Stdlib => crate::bytecode::NATIVE_CALL_KIND_STDLIB,
+            }
+        }
+
+        let (kind, target_name, receiver_emitted) = match target {
+            crate::eval::expr::Expr::Field {
+                target: receiver,
+                field,
+            } => {
+                if !self.emit_expr(ctx, receiver, code)? {
+                    return Err(BytecodeError::InvalidSection(
+                        "unsupported CALL_NATIVE method receiver".into(),
+                    ));
+                }
+                (NativeTargetKind::Method, field.clone(), true)
+            }
+            crate::eval::expr::Expr::Name(name) => {
+                let key = SmolStr::new(name.to_ascii_uppercase());
+                if self.runtime.functions().contains_key(&key) {
+                    (NativeTargetKind::Function, name.clone(), false)
+                } else if self.runtime.stdlib().get(name.as_str()).is_some()
+                    || crate::stdlib::conversions::is_conversion_name(key.as_str())
+                {
+                    (NativeTargetKind::Stdlib, name.clone(), false)
+                } else if ctx.local_ref(name).is_some()
+                    || ctx.self_field_name(name).is_some()
+                    || self.resolve_name_ref(ctx, name)?.is_some()
+                {
+                    if !self.emit_expr(ctx, target, code)? {
+                        return Err(BytecodeError::InvalidSection(
+                            "unsupported CALL_NATIVE function-block target".into(),
+                        ));
+                    }
+                    (NativeTargetKind::FunctionBlock, name.clone(), true)
+                } else {
+                    code.push(0x23); // LOAD_SELF
+                    (NativeTargetKind::Method, name.clone(), true)
+                }
+            }
+            _ => {
+                return Err(BytecodeError::InvalidSection(
+                    "unsupported CALL_NATIVE target expression".into(),
+                ));
+            }
+        };
+
+        let mut arg_tokens = Vec::with_capacity(args.len());
+        for arg in args {
+            let prefix = match &arg.value {
+                crate::eval::ArgValue::Expr(expr) => {
+                    if !self.emit_expr(ctx, expr, code)? {
+                        return Err(BytecodeError::InvalidSection(
+                            "unsupported CALL_NATIVE argument expression".into(),
+                        ));
+                    }
+                    "E"
+                }
+                crate::eval::ArgValue::Target(target) => {
+                    if let Some(reference) = self.resolve_lvalue_ref(ctx, target)? {
+                        let ref_idx = self.ref_index_for(&reference)?;
+                        code.push(0x22); // LOAD_REF_ADDR (static)
+                        code.extend_from_slice(&ref_idx.to_le_bytes());
+                    } else if !self.emit_dynamic_ref_for_lvalue(ctx, target, code)? {
+                        return Err(BytecodeError::InvalidSection(
+                            "unsupported CALL_NATIVE argument target".into(),
+                        ));
+                    }
+                    "T"
+                }
+            };
+            let token = if let Some(name) = &arg.name {
+                SmolStr::new(format!("{prefix}:{}", name.as_str()))
+            } else {
+                SmolStr::new(prefix)
+            };
+            arg_tokens.push(token);
+        }
+
+        let symbol_idx = self.intern_native_call_symbol(&target_name, &arg_tokens);
+        let total_arg_count = if receiver_emitted {
+            args.len().saturating_add(1)
+        } else {
+            args.len()
+        };
+        let arg_count = u32::try_from(total_arg_count)
+            .map_err(|_| BytecodeError::InvalidSection("CALL_NATIVE arg_count overflow".into()))?;
+
+        code.push(0x09); // CALL_NATIVE
+        code.extend_from_slice(&native_kind_value(kind).to_le_bytes());
+        code.extend_from_slice(&symbol_idx.to_le_bytes());
+        code.extend_from_slice(&arg_count.to_le_bytes());
+        Ok(true)
+    }
+
+    fn intern_native_call_symbol(
+        &mut self,
+        target_name: &SmolStr,
+        arg_tokens: &[SmolStr],
+    ) -> u32 {
+        let mut symbol = target_name.as_str().to_owned();
+        for token in arg_tokens {
+            symbol.push('|');
+            symbol.push_str(token.as_str());
+        }
+        self.strings.intern(SmolStr::new(symbol))
     }
 }

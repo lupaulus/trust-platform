@@ -4,12 +4,12 @@ use smol_str::SmolStr;
 
 use crate::error::RuntimeError;
 use crate::eval::ops::{apply_binary, apply_unary, BinaryOp, UnaryOp};
-use crate::memory::{InstanceId, MemoryLocation};
+use crate::memory::{FrameId, InstanceId, MemoryLocation};
 use crate::task::ProgramDef;
 use crate::value::{Value, ValueRef};
 
 use super::super::core::Runtime;
-use super::call::push_call_frame;
+use super::call::{execute_native_call, push_call_frame, VM_LOCAL_SENTINEL_FRAME_ID};
 use super::errors::VmTrap;
 use super::frames::{FrameStack, VmFrame};
 use super::stack::OperandStack;
@@ -167,6 +167,29 @@ fn execute_pou(
             }
             0x07 => return Err(VmTrap::UnsupportedOpcode("CALL_METHOD").into_runtime_error()),
             0x08 => return Err(VmTrap::UnsupportedOpcode("CALL_VIRTUAL").into_runtime_error()),
+            0x09 => {
+                let kind = read_u32(&module.code, &mut pc).map_err(VmTrap::into_runtime_error)?;
+                let symbol_idx =
+                    read_u32(&module.code, &mut pc).map_err(VmTrap::into_runtime_error)?;
+                let arg_count =
+                    read_u32(&module.code, &mut pc).map_err(VmTrap::into_runtime_error)?;
+                let frame = frames
+                    .current_mut()
+                    .ok_or_else(|| VmTrap::CallStackUnderflow.into_runtime_error())?;
+                let result = execute_native_call(
+                    runtime,
+                    module,
+                    frame,
+                    &mut operand_stack,
+                    kind,
+                    symbol_idx,
+                    arg_count,
+                )
+                .map_err(VmTrap::into_runtime_error)?;
+                operand_stack
+                    .push(result)
+                    .map_err(VmTrap::into_runtime_error)?;
+            }
             0x10 => {
                 let const_idx =
                     read_u32(&module.code, &mut pc).map_err(VmTrap::into_runtime_error)?;
@@ -209,9 +232,25 @@ fn execute_pou(
                     .map_err(VmTrap::into_runtime_error)?;
             }
             0x22 => {
-                return Err(VmTrap::UnsupportedOpcode("LOAD_REF_ADDR").into_runtime_error());
+                let ref_idx =
+                    read_u32(&module.code, &mut pc).map_err(VmTrap::into_runtime_error)?;
+                let value_ref =
+                    load_ref_addr(module, &frames, ref_idx).map_err(VmTrap::into_runtime_error)?;
+                operand_stack
+                    .push(Value::Reference(Some(value_ref)))
+                    .map_err(VmTrap::into_runtime_error)?;
             }
-            0x23 => return Err(VmTrap::UnsupportedOpcode("LOAD_SELF").into_runtime_error()),
+            0x23 => {
+                let frame = frames
+                    .current()
+                    .ok_or_else(|| VmTrap::CallStackUnderflow.into_runtime_error())?;
+                let self_instance = frame.runtime_instance.ok_or_else(|| {
+                    VmTrap::Runtime(RuntimeError::TypeMismatch).into_runtime_error()
+                })?;
+                operand_stack
+                    .push(Value::Instance(self_instance))
+                    .map_err(VmTrap::into_runtime_error)?;
+            }
             0x30 => return Err(VmTrap::UnsupportedOpcode("REF_FIELD").into_runtime_error()),
             0x31 => return Err(VmTrap::UnsupportedOpcode("REF_INDEX").into_runtime_error()),
             0x32 => return Err(VmTrap::UnsupportedOpcode("LOAD_DYNAMIC").into_runtime_error()),
@@ -312,6 +351,36 @@ fn load_ref(
                 .read_by_ref_parts(location, offset, path)
                 .cloned()
                 .ok_or(VmTrap::NullReference)
+        }
+    }
+}
+
+fn load_ref_addr(module: &VmModule, frames: &FrameStack, ref_idx: u32) -> Result<ValueRef, VmTrap> {
+    let reference = module
+        .refs
+        .get(ref_idx as usize)
+        .ok_or(VmTrap::InvalidRefIndex(ref_idx))?;
+    match reference {
+        VmRef::Local { path, .. } => {
+            if !path.is_empty() {
+                return Err(VmTrap::UnsupportedRefLocation("local-path"));
+            }
+            let frame = frames.current().ok_or(VmTrap::CallStackUnderflow)?;
+            let local_slot = frame.local_slot_index(ref_idx)?;
+            Ok(ValueRef {
+                location: MemoryLocation::Local(FrameId(VM_LOCAL_SENTINEL_FRAME_ID)),
+                offset: local_slot,
+                path: Vec::new(),
+            })
+        }
+        _ => {
+            let frame = frames.current().ok_or(VmTrap::CallStackUnderflow)?;
+            let (location, offset, path) = runtime_access_target(reference, frame)?;
+            Ok(ValueRef {
+                location,
+                offset,
+                path: path.to_vec(),
+            })
         }
     }
 }

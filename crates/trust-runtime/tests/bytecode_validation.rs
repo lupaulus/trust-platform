@@ -19,10 +19,14 @@ fn opcode_validation() {
 fn opcode_validation_extended() {
     let mut module = base_module();
     if let Some(SectionData::PouBodies(bodies)) = module.section_mut(SectionId::PouBodies) {
-        *bodies = vec![0x14, 0x15, 0x16, 0x02, 0x4C, 0x4D, 0x4E];
+        let mut code = vec![0x14, 0x15, 0x16, 0x02, 0x4C, 0x4D, 0x4E, 0x09];
+        code.extend_from_slice(&0_u32.to_le_bytes());
+        code.extend_from_slice(&0_u32.to_le_bytes());
+        code.extend_from_slice(&0_u32.to_le_bytes());
+        *bodies = code;
     }
     if let Some(SectionData::PouIndex(index)) = module.section_mut(SectionId::PouIndex) {
-        index.entries[0].code_length = 7;
+        index.entries[0].code_length = 20;
     }
     let bytes = module.encode().expect("encode");
     let decoded = BytecodeModule::decode(&bytes).expect("decode");

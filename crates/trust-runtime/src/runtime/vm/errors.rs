@@ -27,6 +27,9 @@ pub(super) enum VmTrap {
     MissingPou(u32),
     MissingProgram(SmolStr),
     MissingFunctionBlock(SmolStr),
+    InvalidNativeCallKind(u32),
+    InvalidNativeSymbolIndex(u32),
+    InvalidNativeCall(SmolStr),
     BytecodeDecode(SmolStr),
     Runtime(RuntimeError),
 }
@@ -43,6 +46,15 @@ impl VmTrap {
             Self::MissingProgram(name) => RuntimeError::UndefinedProgram(name),
             Self::MissingFunctionBlock(name) => RuntimeError::UndefinedFunctionBlock(name),
             Self::DeadlineExceeded | Self::BudgetExceeded => RuntimeError::ExecutionTimeout,
+            Self::InvalidNativeCallKind(kind) => {
+                RuntimeError::InvalidBytecode(format!("vm invalid CALL_NATIVE kind {kind}").into())
+            }
+            Self::InvalidNativeSymbolIndex(idx) => RuntimeError::InvalidBytecode(
+                format!("vm invalid index {idx} for native symbol").into(),
+            ),
+            Self::InvalidNativeCall(message) => RuntimeError::InvalidBytecode(
+                format!("vm invalid CALL_NATIVE payload: {message}").into(),
+            ),
             Self::Runtime(err) => err,
             Self::InvalidOpcode(opcode) => {
                 RuntimeError::InvalidBytecode(format!("vm invalid opcode 0x{opcode:02X}").into())

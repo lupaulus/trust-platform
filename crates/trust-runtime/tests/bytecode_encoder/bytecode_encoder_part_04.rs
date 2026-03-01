@@ -168,10 +168,6 @@ END_PROGRAM
 #[test]
 fn encoder_does_not_emit_partial_if_with_unsupported_elsif() {
     let source = r#"
-FUNCTION IsReady : BOOL
-IsReady := TRUE;
-END_FUNCTION
-
 PROGRAM Main
 VAR
     counter : INT := 0;
@@ -179,7 +175,7 @@ END_VAR
 
 IF counter < 1 THEN
     counter := counter + 1;
-ELSIF IsReady() THEN
+ELSIF "A" = "B" THEN
     counter := counter + 2;
 END_IF;
 END_PROGRAM

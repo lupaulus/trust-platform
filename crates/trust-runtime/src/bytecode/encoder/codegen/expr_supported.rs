@@ -37,6 +37,28 @@ fn expr_supported(expr: &crate::eval::expr::Expr) -> bool {
             ) && expr_supported(left)
                 && expr_supported(right)
         }
+        Expr::Call { target, args } => {
+            matches!(
+                target.as_ref(),
+                Expr::Name(_) | Expr::Field { .. }
+            ) && args.iter().all(call_arg_supported)
+        }
         _ => false,
+    }
+}
+
+fn call_arg_supported(arg: &crate::eval::CallArg) -> bool {
+    use crate::eval::ArgValue;
+    match &arg.value {
+        ArgValue::Expr(expr) => expr_supported(expr),
+        ArgValue::Target(target) => lvalue_supported(target),
+    }
+}
+
+fn lvalue_supported(target: &crate::eval::expr::LValue) -> bool {
+    match target {
+        crate::eval::expr::LValue::Name(_) | crate::eval::expr::LValue::Field { .. } => true,
+        crate::eval::expr::LValue::Index { indices, .. } => indices.iter().all(expr_supported),
+        crate::eval::expr::LValue::Deref(expr) => expr_supported(expr),
     }
 }

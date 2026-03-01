@@ -3,6 +3,11 @@ pub struct PouIndex {
     pub entries: Vec<PouEntry>,
 }
 
+pub const NATIVE_CALL_KIND_FUNCTION: u32 = 0;
+pub const NATIVE_CALL_KIND_FUNCTION_BLOCK: u32 = 1;
+pub const NATIVE_CALL_KIND_METHOD: u32 = 2;
+pub const NATIVE_CALL_KIND_STDLIB: u32 = 3;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PouEntry {
     pub id: u32,

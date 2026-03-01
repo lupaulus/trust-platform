@@ -6,12 +6,13 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 ## [Unreleased]
 
-Target release: `v0.9.22`
+Target release: `v0.9.23`
 
 ### Added
 
 - MP-060 Phase A execution-backend controls for `trust-runtime`: new `runtime.execution_backend` config (`interpreter|vm`), new CLI override `--execution-backend=interpreter|vm` for `run`/`play`, startup backend-selection log event, backend mode/source fields in control `status`/`config.get`, and Prometheus backend info metric (`trust_runtime_execution_backend_info`). `vm` selection is intentionally fail-fast until VM execution lands in the next MP-060 phase.
 - MP-060 Phase B VM core for `trust-runtime`: `runtime.execution_backend='vm'` now runs a real bytecode executor with deterministic program-counter dispatch, operand and call/frame stacks, trap/deadline/budget enforcement, stable trap-to-`RuntimeError` mapping, and slot/index-based VM hot-path access with symbol/source mapping tables preserved for external/debug name-based surfaces. Interpreter remains the default backend.
+- MP-060 Phase C1 call-parity rollout for `trust-runtime`: VM codegen/dispatch now emits and executes `CALL_NATIVE` (`kind/symbol/arg_count`) for function/FB/method/stdlib paths, routes builtin FB and stdlib behavior through the same native-call convention, preserves named/default/IN_OUT parity, and replaces C1-required silent NOP call fallthrough with deterministic compile/validate/runtime failures.
 - IDE settings coverage expanded for standalone/offline authoring: new fields for control endpoint/resource name, runtime cloud profile, extended OPC UA options, and observability options.
 - IDE settings discoverability improvements: `/ide/settings` now opens in an `All Settings` view by default and adds filter-by-name/key search so MQTT/PLC/TLS/realtime/debug configuration is immediately accessible.
 - IDE settings reliability hardening: `/ide/settings` now includes standalone `simulation.toml` controls (`simulation.enabled`, `simulation.seed`, `simulation.time_scale`), shows active filter summary/clear controls to prevent hidden-field confusion, and limits live `config.set` writes to backend-supported keys to avoid false save failures.

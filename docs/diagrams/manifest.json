@@ -1,6 +1,6 @@
 {
   "docs/diagrams/architecture/runtime-cloud-planes.puml": "3c6dfac75e9ce0e77f1a503caf149d0ea611f5427e7c4e8bac7490fe2befeaf7",
-  "docs/diagrams/architecture/runtime-execution.puml": "fd081ed40e0438f24304d5370a50841203d14843ac23ecf57f4b04b299f9e720",
+  "docs/diagrams/architecture/runtime-execution.puml": "40dc402384d601ef638f1e30e331bd4a6a5170bb98e2bad287f4fccbcf840e49",
   "docs/diagrams/architecture/system-architecture.puml": "ff1303beb1326d1bcfeff039217eafa2a055c981904f46fcc9223328a28bb960",
   "docs/diagrams/debug/debug-architecture.puml": "59105e9ff8c11eb2af11c2e64dc96bd32e3fb57875252bd01d132559ad059681",
   "docs/diagrams/debug/debug-breakpoint-after-launch-actual-observed.puml": "26f721f18337bb329bff7587d829284e5cac207bdff52dc7dcc899b38ddb4173",
