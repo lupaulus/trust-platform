@@ -163,6 +163,58 @@ fn mutate_first_const_payload_for_primitive(
     }
 }
 
+fn patch_first_call_native_arg_count(module: &mut BytecodeModule, arg_count: u32) {
+    fn opcode_operand_len(opcode: u8) -> Option<usize> {
+        match opcode {
+            0x00
+            | 0x01
+            | 0x06
+            | 0x11
+            | 0x12
+            | 0x13
+            | 0x14
+            | 0x15
+            | 0x23
+            | 0x24
+            | 0x31
+            | 0x32
+            | 0x33
+            | 0x40..=0x4E
+            | 0x50..=0x55 => Some(0),
+            0x02..=0x05 | 0x07 | 0x10 | 0x20..=0x22 | 0x30 | 0x60 | 0x70 => Some(4),
+            0x08 => Some(8),
+            0x09 => Some(12),
+            0x16 => Some(1),
+            _ => None,
+        }
+    }
+
+    let (_, start, end) = main_pou_entry(module);
+    let code = match module.section_mut(SectionId::PouBodies) {
+        Some(SectionData::PouBodies(code)) => code,
+        _ => panic!("missing POU_BODIES"),
+    };
+
+    let mut patched = false;
+    let mut pc = start;
+    while pc < end {
+        let opcode = code[pc];
+        if opcode == 0x09 {
+            if pc + 13 > end {
+                panic!("truncated CALL_NATIVE payload");
+            }
+            code[pc + 9..pc + 13].copy_from_slice(&arg_count.to_le_bytes());
+            patched = true;
+            break;
+        }
+        pc += opcode_operand_len(opcode)
+            .map(|len| 1 + len)
+            .unwrap_or_else(|| panic!("invalid opcode in main body: 0x{opcode:02X}"));
+    }
+
+    assert!(patched, "expected at least one CALL_NATIVE in main body");
+}
+
 #[test]
 fn vm_executes_program_with_stack_and_pc_progression() {
     let source = r#"
@@ -259,6 +311,102 @@ fn vm_opcode_positive_path_covers_call_native_stdlib_dispatch() {
 }
 
 #[test]
+fn vm_opcode_positive_path_covers_call_native_oop_dispatch() {
+    let source = r#"
+        INTERFACE ICounter
+        METHOD Inc : INT
+        VAR_INPUT
+            delta : INT;
+        END_VAR
+        END_METHOD
+        END_INTERFACE
+
+        CLASS Counter IMPLEMENTS ICounter
+        VAR PUBLIC
+            value : INT := INT#0;
+        END_VAR
+        METHOD PUBLIC Inc : INT
+        VAR_INPUT
+            delta : INT;
+        END_VAR
+        value := value + delta;
+        Inc := value;
+        END_METHOD
+        END_CLASS
+
+        FUNCTION_BLOCK ThisCounter
+        VAR
+            count : INT := INT#5;
+        END_VAR
+        VAR_OUTPUT
+            value : INT;
+        END_VAR
+        value := THIS.count;
+        END_FUNCTION_BLOCK
+
+        FUNCTION_BLOCK BaseFb
+        VAR PUBLIC
+            count : INT := INT#10;
+        END_VAR
+        METHOD PUBLIC GetCount : INT
+        GetCount := count;
+        END_METHOD
+        END_FUNCTION_BLOCK
+
+        FUNCTION_BLOCK DerivedFb EXTENDS BaseFb
+        VAR PUBLIC
+            extra : INT := INT#3;
+        END_VAR
+        METHOD PUBLIC GetCount : INT
+        GetCount := count + extra;
+        END_METHOD
+        METHOD PUBLIC GetSuper : INT
+        GetSuper := SUPER.GetCount();
+        END_METHOD
+        END_FUNCTION_BLOCK
+
+        PROGRAM Main
+        VAR
+            i : ICounter;
+            c : Counter;
+            fb_this : ThisCounter;
+            fb_derived : DerivedFb;
+            out_this : INT := INT#0;
+            out_override : INT := INT#0;
+            out_super : INT := INT#0;
+            out_iface : INT := INT#0;
+            out_direct : INT := INT#0;
+        END_VAR
+        i := c;
+        fb_this(value => out_this);
+        out_override := fb_derived.GetCount();
+        out_super := fb_derived.GetSuper();
+        out_iface := i.Inc(INT#1);
+        out_direct := c.Inc(INT#2);
+        END_PROGRAM
+    "#;
+    let module = bytecode_module_from_source(source).expect("compile bytecode module");
+    let body = main_body_bytes(&module);
+    assert!(
+        body.contains(&0x09),
+        "expected CALL_NATIVE opcode in main body"
+    );
+
+    let mut harness = vm_harness(source);
+    let cycle = harness.cycle();
+    assert!(
+        cycle.errors.is_empty(),
+        "CALL_NATIVE OOP dispatch failed: {:?}",
+        cycle.errors
+    );
+    harness.assert_eq("out_this", 5i16);
+    harness.assert_eq("out_override", 13i16);
+    harness.assert_eq("out_super", 10i16);
+    harness.assert_eq("out_iface", 1i16);
+    harness.assert_eq("out_direct", 3i16);
+}
+
+#[test]
 fn vm_opcode_positive_path_covers_string_and_wstring_literals() {
     let source = r#"
         PROGRAM Main
@@ -339,6 +487,34 @@ fn vm_rejects_invalid_call_native_symbol_index() {
     replace_main_body(&mut module, &body);
 
     assert_apply_invalid_bytecode_contains(&module, "invalid index 255 for native symbol");
+}
+
+#[test]
+fn vm_rejects_invalid_call_native_method_missing_receiver_payload() {
+    let source = r#"
+        CLASS Counter
+        METHOD PUBLIC Next : INT
+        Next := INT#1;
+        END_METHOD
+        END_CLASS
+
+        PROGRAM Main
+        VAR
+            c : Counter;
+            out_next : INT := INT#0;
+        END_VAR
+        out_next := c.Next();
+        END_PROGRAM
+    "#;
+    let mut module = bytecode_module_from_source(source).expect("compile module");
+    patch_first_call_native_arg_count(&mut module, 0);
+
+    let mut harness = vm_harness_from_module(source, &module);
+    let cycle = harness.cycle();
+    assert_invalid_bytecode_contains(
+        &cycle.errors,
+        "vm invalid CALL_NATIVE payload: arg_count smaller than native receiver arity",
+    );
 }
 
 #[test]

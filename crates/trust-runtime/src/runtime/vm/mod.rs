@@ -211,6 +211,7 @@ pub(super) fn opcode_operand_len(opcode: u8) -> Option<usize> {
         | 0x14
         | 0x15
         | 0x23
+        | 0x24
         | 0x31
         | 0x32
         | 0x33

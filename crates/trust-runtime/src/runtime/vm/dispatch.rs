@@ -251,6 +251,24 @@ fn execute_pou(
                     .push(Value::Instance(self_instance))
                     .map_err(VmTrap::into_runtime_error)?;
             }
+            0x24 => {
+                let frame = frames
+                    .current()
+                    .ok_or_else(|| VmTrap::CallStackUnderflow.into_runtime_error())?;
+                let self_instance = frame.runtime_instance.ok_or_else(|| {
+                    VmTrap::Runtime(RuntimeError::TypeMismatch).into_runtime_error()
+                })?;
+                let instance = runtime
+                    .storage
+                    .get_instance(self_instance)
+                    .ok_or_else(|| VmTrap::NullReference.into_runtime_error())?;
+                let super_instance = instance.parent.ok_or_else(|| {
+                    VmTrap::Runtime(RuntimeError::TypeMismatch).into_runtime_error()
+                })?;
+                operand_stack
+                    .push(Value::Instance(super_instance))
+                    .map_err(VmTrap::into_runtime_error)?;
+            }
             0x30 => return Err(VmTrap::UnsupportedOpcode("REF_FIELD").into_runtime_error()),
             0x31 => return Err(VmTrap::UnsupportedOpcode("REF_INDEX").into_runtime_error()),
             0x32 => return Err(VmTrap::UnsupportedOpcode("LOAD_DYNAMIC").into_runtime_error()),

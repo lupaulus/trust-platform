@@ -41,6 +41,14 @@ impl<'a> BytecodeEncoder<'a> {
                 code.extend_from_slice(&ref_idx.to_le_bytes());
                 Ok(true)
             }
+            crate::eval::expr::Expr::This => {
+                code.push(0x23); // LOAD_SELF
+                Ok(true)
+            }
+            crate::eval::expr::Expr::Super => {
+                code.push(0x24); // LOAD_SUPER
+                Ok(true)
+            }
             crate::eval::expr::Expr::Field { target, field } => {
                 if let crate::eval::expr::Expr::Name(base) = target.as_ref() {
                     if self.emit_dynamic_load_field(ctx, base, field, code)? {

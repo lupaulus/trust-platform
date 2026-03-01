@@ -253,3 +253,90 @@ fn differential_c2_string_stdlib_dispatch_with_literals() {
         1,
     );
 }
+
+#[test]
+fn differential_c3_this_super_and_method_dispatch() {
+    let source = r#"
+        FUNCTION_BLOCK ThisCounter
+        VAR
+            count : INT := INT#5;
+        END_VAR
+        VAR_OUTPUT
+            value : INT;
+        END_VAR
+        value := THIS.count;
+        END_FUNCTION_BLOCK
+
+        FUNCTION_BLOCK BaseFb
+        VAR PUBLIC
+            count : INT := INT#10;
+        END_VAR
+        METHOD PUBLIC GetCount : INT
+        GetCount := count;
+        END_METHOD
+        END_FUNCTION_BLOCK
+
+        FUNCTION_BLOCK DerivedFb EXTENDS BaseFb
+        VAR PUBLIC
+            extra : INT := INT#3;
+        END_VAR
+        METHOD PUBLIC GetCount : INT
+        GetCount := count + extra;
+        END_METHOD
+        METHOD PUBLIC GetSuper : INT
+        GetSuper := SUPER.GetCount();
+        END_METHOD
+        END_FUNCTION_BLOCK
+
+        PROGRAM Main
+        VAR
+            fb_this : ThisCounter;
+            fb_derived : DerivedFb;
+            out_this : INT := INT#0;
+            out_override : INT := INT#0;
+            out_super : INT := INT#0;
+        END_VAR
+        fb_this(value => out_this);
+        out_override := fb_derived.GetCount();
+        out_super := fb_derived.GetSuper();
+        END_PROGRAM
+    "#;
+
+    assert_backend_parity(source, &["out_this", "out_override", "out_super"], 1);
+}
+
+#[test]
+fn differential_c3_interface_method_dispatch() {
+    let source = r#"
+        INTERFACE ICounter
+        METHOD Next : INT
+        END_METHOD
+        END_INTERFACE
+
+        CLASS Counter IMPLEMENTS ICounter
+        VAR PUBLIC
+            value : INT := INT#0;
+        END_VAR
+        METHOD PUBLIC Next : INT
+        value := value + INT#1;
+        Next := value;
+        END_METHOD
+        END_CLASS
+
+        PROGRAM Main
+        VAR
+            c : Counter;
+            i : ICounter;
+            out_iface_1 : INT := INT#0;
+            out_direct : INT := INT#0;
+            out_iface_2 : INT := INT#0;
+        END_VAR
+        i := c;
+        out_iface_1 := i.Next();
+        out_direct := c.Next();
+        out_iface_2 := i.Next();
+        END_PROGRAM
+    "#;
+
+    assert_backend_parity(source, &["out_iface_1", "out_direct", "out_iface_2"], 1);
+}

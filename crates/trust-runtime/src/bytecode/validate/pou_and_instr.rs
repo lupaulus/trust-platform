@@ -166,7 +166,7 @@ fn validate_instruction_stream(
                 let ref_idx = reader.read_u32()?;
                 ensure_ref_index(ref_table, ref_idx)?;
             }
-            0x23 => {}
+            0x23 | 0x24 => {}
             0x30 => {
                 reader.read_u32()?;
             }
