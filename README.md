@@ -158,6 +158,7 @@ starts a local runtime for debugging and inline values.
 - `docs/guides/WEB_IDE_FULL_BROWSER_GUIDE.md` — runtime-hosted Browser IDE (`/ide`) usage and API surface
 - `docs/guides/HMI_DIRECTORY_WORKFLOW.md` — `hmi/` directory format, process SVG pages, and LM tool workflow
 - `docs/guides/RUNTIME_CLOUD_MANUAL.md` — runtime cloud onboarding manual (quickstart, profiles, federation, UI, troubleshooting)
+- `docs/guides/RUNTIME_EXECUTION_BACKEND_MIGRATION.md` — MP-060 backend mode controls, rollback workflow, and interpreter compatibility-window policy
 - `examples/README.md` — guided example/tutorial tracks with setup walkthroughs
 - `examples/runtime_cloud/README.md` — runtime cloud payload/config example pack
 - `docs/guides/PLC_QUICK_START.md` — hands-on quick start

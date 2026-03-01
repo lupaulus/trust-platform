@@ -11,6 +11,7 @@ Legend: `[ ]` pending, `[x]` complete.
 - [x] Neovim and Zed editor integration smoke gate is enforced (`scripts/check_editor_integration_smoke.sh`).
 - [x] Workspace and VS Code extension release versions are enforced to stay aligned (`Cargo.toml`, `package.json`, `package-lock.json` root fields).
 - [x] Main/master version bumps are blocked unless matching tag + successful release workflow + published GitHub release evidence exist.
+- [x] `version-release-guard` gate evidence is published as `gate-version-release-guard` and required by the aggregated release-gate report.
 
 ## Reliability Gates
 - [x] Nightly workflow runs runtime load and soak scripts.

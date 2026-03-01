@@ -31,6 +31,11 @@ User-facing runtime cloud onboarding docs are here:
 Runnable payload/config examples:
 - `examples/runtime_cloud/README.md`
 
+## Runtime Execution Backend Migration
+
+Backend mode controls, rollback workflow, compatibility-window policy, and release-evidence expectations for MP-060 are documented in:
+`docs/guides/RUNTIME_EXECUTION_BACKEND_MIGRATION.md`.
+
 ## HMI Directory Workflow
 
 Production `hmi/` descriptor usage (including process SVG pages and LM tool

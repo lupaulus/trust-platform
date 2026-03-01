@@ -147,3 +147,21 @@ fn execution_backend_selection_cli_overrides_bundle() {
         trust_runtime::execution_backend::ExecutionBackendSource::Flag
     );
 }
+
+#[test]
+fn execution_backend_selection_cli_interpreter_overrides_vm_bundle() {
+    let bundle =
+        bundle_with_backend(trust_runtime::execution_backend::ExecutionBackend::BytecodeVm);
+    let (backend, source) = super::resolve_execution_backend_selection(
+        Some(&bundle),
+        Some(crate::cli::ExecutionBackendArg::Interpreter),
+    );
+    assert_eq!(
+        backend,
+        trust_runtime::execution_backend::ExecutionBackend::Interpreter
+    );
+    assert_eq!(
+        source,
+        trust_runtime::execution_backend::ExecutionBackendSource::Flag
+    );
+}
