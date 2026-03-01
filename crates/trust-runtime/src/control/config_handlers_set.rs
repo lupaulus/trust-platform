@@ -298,6 +298,12 @@ pub(super) fn handle_config_set(
                 updated.push("control.mode");
                 restart_required.push("control.mode");
             }
+            "runtime.execution_backend" | "runtime.execution_backend_source" => {
+                return ControlResponse::error(
+                    id,
+                    "runtime.execution_backend is startup-only; change backend via startup CLI/config and restart".into(),
+                );
+            }
             _ => {
                 return ControlResponse::error(id, format!("unknown config key '{key}'"));
             }

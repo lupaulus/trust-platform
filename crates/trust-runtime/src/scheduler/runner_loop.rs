@@ -327,11 +327,7 @@ fn apply_resource_command(runtime: &mut Runtime, command: ResourceCommand) {
         }
         ResourceCommand::UpdateIoSafeState(state) => runtime.set_io_safe_state(state),
         ResourceCommand::ReloadBytecode { bytes, respond_to } => {
-            let result = runtime
-                .apply_bytecode_bytes(&bytes, None)
-                .and_then(|_| runtime.restart(crate::RestartMode::Warm))
-                .and_then(|_| runtime.load_retain_store())
-                .map(|_| runtime.metadata_snapshot());
+            let result = runtime.apply_online_change_bytes(&bytes, None);
             let _ = respond_to.send(result);
         }
         ResourceCommand::MeshSnapshot { names, respond_to } => {

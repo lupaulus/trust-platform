@@ -269,6 +269,45 @@ END_PROGRAM
 }
 
 #[test]
+fn config_set_rejects_runtime_backend_switch_during_live_control() {
+    let source = r#"
+PROGRAM Main
+VAR
+    run : BOOL := TRUE;
+END_VAR
+END_PROGRAM
+"#;
+    let state = hmi_test_state(source);
+
+    let response = handle_request_value(
+        json!({
+            "id": 24,
+            "type": "config.set",
+            "params": { "runtime.execution_backend": "vm" }
+        }),
+        &state,
+        None,
+    );
+    assert!(!response.ok);
+    assert_eq!(
+        response.error.as_deref(),
+        Some(
+            "runtime.execution_backend is startup-only; change backend via startup CLI/config and restart"
+        )
+    );
+
+    let status = handle_request_value(json!({"id": 25, "type": "status"}), &state, None);
+    assert!(status.ok, "status should succeed: {:?}", status.error);
+    let result = status.result.expect("status result");
+    assert_eq!(
+        result
+            .get("execution_backend")
+            .and_then(serde_json::Value::as_str),
+        Some("interpreter")
+    );
+}
+
+#[test]
 fn invalid_and_malformed_requests_return_negative_responses() {
     let source = r#"
 PROGRAM Main

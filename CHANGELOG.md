@@ -6,7 +6,7 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 ## [Unreleased]
 
-Target release: `v0.9.25`
+Target release: `v0.9.26`
 
 ### Added
 
@@ -19,6 +19,7 @@ Target release: `v0.9.25`
 - MP-060 Phase C5 parity rollout for `trust-runtime`: VM lowering/runtime now supports `SIZEOF(type)`/`SIZEOF(expr)` (`SIZEOF_TYPE`/`SIZEOF_VALUE`), adds deterministic validator/runtime opcode failure coverage for C5 paths, and replaces silent VM-lowering fallthrough for remaining C5 edge statements (`?=`/`JMP`/`RETURN`/`EXIT`/`CONTINUE`) with deterministic compile-time rejection.
 - MP-060 Phase C audit follow-up hardening for `trust-runtime`: added per-subphase negative-path interpreter-vs-VM differential coverage (C1..C5), extended C2 string stdlib parity coverage to include both `FIND` found/not-found paths, and added a deterministic `SIZEOF_TYPE` recursion-depth guard (`max depth 128`) for deep non-cyclic type-table graphs.
 - MP-060 Phase D debug/observability parity for `trust-runtime`: VM execution now resolves statement stops through bytecode debug-map `(pou_id, pc)` source mappings, preserves breakpoint/step and debug-write workflow parity with interpreter mode, and keeps backend metrics/runtime-event observability contracts stable across interpreter and VM backends.
+- MP-060 Phase E online-change groundwork for `trust-runtime`: hot-reload semantics are now centralized in a dedicated runtime online-change contract (`apply_online_change_bytes`) with cycle-boundary swap handling, warm-restart entrypoint invalidation, retain/global/instance migration coverage, deterministic invalid-bytecode diagnostics, and explicit startup-only backend-switch diagnostics for live `config.set` requests.
 - IDE settings coverage expanded for standalone/offline authoring: new fields for control endpoint/resource name, runtime cloud profile, extended OPC UA options, and observability options.
 - IDE settings discoverability improvements: `/ide/settings` now opens in an `All Settings` view by default and adds filter-by-name/key search so MQTT/PLC/TLS/realtime/debug configuration is immediately accessible.
 - IDE settings reliability hardening: `/ide/settings` now includes standalone `simulation.toml` controls (`simulation.enabled`, `simulation.seed`, `simulation.time_scale`), shows active filter summary/clear controls to prevent hidden-field confusion, and limits live `config.set` writes to backend-supported keys to avoid false save failures.

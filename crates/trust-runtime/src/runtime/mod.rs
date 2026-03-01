@@ -11,6 +11,7 @@ mod io_subsystem;
 mod mesh;
 mod metadata;
 mod metrics_subsystem;
+mod online_change;
 mod restart;
 mod retain_store;
 pub(crate) mod types;

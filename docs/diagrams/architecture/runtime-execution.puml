@@ -47,7 +47,11 @@ package "Runtime Core" as runtimeCore #LightGreen {
         +execute_cycle() → Result<()>
         +apply_bytecode_metadata()
         +apply_bytecode_module()
+        +apply_online_change_bytes()
     }
+
+    component "online_change.rs\n(bytecode swap + warm-restart migration contract)" as runtimeOnlineChange
+    runtime ..> runtimeOnlineChange : hot-reload contract owner
 }
 
 package "Execution Backend Boundary" as backendPkg #LightYellow {
@@ -200,6 +204,17 @@ package "Lifecycle" as lifecyclePkg #LightGray {
         card "1. stop tasks" as stop1
         card "2. save_retain()" as stop2
     }
+
+    rectangle "online_change()" as onlineChangeFlow #Wheat {
+        card "1. queue ReloadBytecode command" as online1
+        card "2. scheduler applies swap at cycle boundary" as online2
+        card "3. apply_online_change_bytes()" as online3
+        card "4. warm restart + retain reload\n(restart-entrypoint IP policy)" as online4
+    }
+
+    online1 --> online2
+    online2 --> online3
+    online3 --> online4
 }
 
 ' ============================================================
