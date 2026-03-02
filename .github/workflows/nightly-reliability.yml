@@ -142,6 +142,14 @@ jobs:
             --max-soak-rss-kb "${SOAK_MAX_RSS_KB}" \
             --max-soak-cpu-pct "${SOAK_MAX_CPU_PCT}"
 
+      - name: Run MP-060 full differential suite gate
+        run: |
+          OUT_DIR=artifacts/nightly/runtime-vm-differential \
+          TRUST_VM_DIFFERENTIAL_PROFILE=full \
+          TRUST_VM_DIFFERENTIAL_TEST_THREADS=1 \
+          TRUST_VM_DIFFERENTIAL_MAX_SECONDS=1800 \
+          ./scripts/runtime_vm_differential_gate.sh
+
       - name: Upload reliability artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@v4

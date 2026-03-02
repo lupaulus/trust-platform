@@ -204,6 +204,19 @@ jobs:
           TRUST_VM_BENCH_PROFILE=quick \
           TRUST_VM_BENCH_ENFORCE_THRESHOLDS=0 \
           ./scripts/runtime_vm_bench_gate.sh
+      - name: Capture MP-060 determinism/reliability evidence
+        run: |
+          OUT_DIR=gate-artifacts/runtime-vm-determinism \
+          TRUST_VM_DETERMINISM_ITERATIONS=2 \
+          TRUST_VM_DETERMINISM_TEST_THREADS=1 \
+          ./scripts/runtime_vm_determinism_reliability_gate.sh
+      - name: Enforce MP-060 differential quick subset gate
+        run: |
+          OUT_DIR=gate-artifacts/runtime-vm-differential \
+          TRUST_VM_DIFFERENTIAL_PROFILE=quick \
+          TRUST_VM_DIFFERENTIAL_TEST_THREADS=1 \
+          TRUST_VM_DIFFERENTIAL_MAX_SECONDS=240 \
+          ./scripts/runtime_vm_differential_gate.sh
       - name: Enforce runtime cloud security profile evidence gate
         run: |
           OUT_DIR=gate-artifacts/runtime-cloud-security-profiles \
@@ -225,6 +238,8 @@ jobs:
             gate-artifacts/runtime-comms-fuzz/**
             gate-artifacts/runtime-comms-bench/**
             gate-artifacts/runtime-vm-bench/**
+            gate-artifacts/runtime-vm-determinism/**
+            gate-artifacts/runtime-vm-differential/**
             gate-artifacts/runtime-cloud-security-profiles/**
             gate-artifacts/runtime-comms-conformance/**
       - name: Mark gate success
