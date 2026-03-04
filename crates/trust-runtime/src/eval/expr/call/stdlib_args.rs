@@ -1,4 +1,4 @@
-pub(super) fn bind_stdlib_named_args(
+pub(crate) fn bind_stdlib_named_args(
     ctx: &mut EvalContext<'_>,
     params: &StdParams,
     args: &[CallArg],

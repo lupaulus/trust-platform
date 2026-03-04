@@ -4,9 +4,11 @@ use crate::bytecode::{
     NATIVE_CALL_KIND_FUNCTION, NATIVE_CALL_KIND_FUNCTION_BLOCK, NATIVE_CALL_KIND_METHOD,
     NATIVE_CALL_KIND_STDLIB,
 };
-use crate::eval::expr::{Expr, LValue};
-use crate::eval::{ArgValue, CallArg};
+use crate::error::RuntimeError;
+use crate::eval::expr::{self, Expr, LValue};
+use crate::eval::{ArgValue, CallArg, EvalContext};
 use crate::memory::{FrameId, InstanceId, MemoryLocation};
+use crate::stdlib::{conversions, time, StdParams};
 use crate::value::{Value, ValueRef};
 
 use super::errors::VmTrap;
@@ -121,43 +123,34 @@ pub(super) fn execute_native_call(
         }
     }
 
-    let call_target = match kind {
+    match kind {
         NATIVE_CALL_KIND_FUNCTION | NATIVE_CALL_KIND_STDLIB => {
             if target_name.is_empty() {
                 return Err(VmTrap::InvalidNativeCall(
                     "missing native function target".into(),
                 ));
             }
-            Expr::Name(target_name)
         }
         NATIVE_CALL_KIND_FUNCTION_BLOCK => {
-            let receiver = receiver_value.ok_or_else(|| {
+            receiver_value.as_ref().ok_or_else(|| {
                 VmTrap::InvalidNativeCall("missing function-block receiver payload".into())
             })?;
-            Expr::Literal(receiver)
         }
         NATIVE_CALL_KIND_METHOD => {
             if target_name.is_empty() {
                 return Err(VmTrap::InvalidNativeCall("missing method name".into()));
             }
-            let receiver = receiver_value.ok_or_else(|| {
+            receiver_value.as_ref().ok_or_else(|| {
                 VmTrap::InvalidNativeCall("missing method receiver payload".into())
             })?;
-            Expr::Field {
-                target: Box::new(Expr::Literal(receiver)),
-                field: target_name,
-            }
         }
         _ => return Err(VmTrap::InvalidNativeCallKind(kind)),
-    };
-    let call_expr = Expr::Call {
-        target: Box::new(call_target),
-        args: call_args,
-    };
+    }
 
-    let call_result = runtime.with_eval_context(temp_local_frame, None, |ctx| {
-        ctx.current_instance = frame.runtime_instance;
-        crate::eval::eval_expr(ctx, &call_expr)
+    let current_instance = frame.runtime_instance;
+    let call_result = runtime.with_eval_context(temp_local_frame, None, move |ctx| {
+        ctx.current_instance = current_instance;
+        dispatch_native_call(ctx, kind, &target_name, receiver_value, &call_args)
     });
 
     if let Some(local_frame_id) = temp_local_frame {
@@ -169,6 +162,118 @@ pub(super) fn execute_native_call(
     }
 
     call_result.map_err(VmTrap::from)
+}
+
+fn dispatch_native_call(
+    ctx: &mut EvalContext<'_>,
+    kind: u32,
+    target_name: &SmolStr,
+    receiver_value: Option<Value>,
+    call_args: &[CallArg],
+) -> Result<Value, RuntimeError> {
+    match kind {
+        NATIVE_CALL_KIND_FUNCTION => dispatch_native_function(ctx, target_name, call_args),
+        NATIVE_CALL_KIND_STDLIB => dispatch_native_stdlib(ctx, target_name, call_args),
+        NATIVE_CALL_KIND_FUNCTION_BLOCK => {
+            dispatch_native_function_block(ctx, target_name, receiver_value, call_args)
+        }
+        NATIVE_CALL_KIND_METHOD => {
+            dispatch_native_method(ctx, target_name, receiver_value, call_args)
+        }
+        _ => Err(RuntimeError::InvalidBytecode(
+            format!("vm invalid CALL_NATIVE kind {kind}").into(),
+        )),
+    }
+}
+
+fn dispatch_native_function(
+    ctx: &mut EvalContext<'_>,
+    target_name: &SmolStr,
+    call_args: &[CallArg],
+) -> Result<Value, RuntimeError> {
+    let key = SmolStr::new(target_name.to_ascii_uppercase());
+    if let Some(functions) = ctx.functions {
+        if let Some(function) = functions.get(&key) {
+            return crate::eval::call_function(ctx, function, call_args);
+        }
+        if !target_name.contains('.') {
+            if let Some(using) = ctx.using {
+                if let Some(function) =
+                    expr::resolve_using_function(functions, target_name.as_str(), using)
+                {
+                    return crate::eval::call_function(ctx, function, call_args);
+                }
+            }
+        }
+    }
+    Err(RuntimeError::UndefinedFunction(target_name.clone()))
+}
+
+fn dispatch_native_stdlib(
+    ctx: &mut EvalContext<'_>,
+    target_name: &SmolStr,
+    call_args: &[CallArg],
+) -> Result<Value, RuntimeError> {
+    let key = SmolStr::new(target_name.to_ascii_uppercase());
+    if time::is_split_name(key.as_str()) {
+        return expr::eval_split_call(ctx, key.as_str(), call_args);
+    }
+    let has_named_args = call_args.iter().any(|arg| arg.name.is_some());
+    let stdlib = ctx.stdlib.ok_or(RuntimeError::TypeMismatch)?;
+    if let Some(entry) = stdlib.get(key.as_str()) {
+        let values = if has_named_args {
+            expr::bind_stdlib_named_args(ctx, &entry.params, call_args)?
+        } else {
+            expr::eval_positional_args(ctx, call_args)?
+        };
+        return (entry.func)(&values);
+    }
+    if conversions::is_conversion_name(key.as_str()) {
+        let params = StdParams::Fixed(vec![SmolStr::new("IN")]);
+        let values = if has_named_args {
+            expr::bind_stdlib_named_args(ctx, &params, call_args)?
+        } else {
+            expr::eval_positional_args(ctx, call_args)?
+        };
+        return stdlib.call(key.as_str(), &values);
+    }
+    Err(RuntimeError::UndefinedFunction(target_name.clone()))
+}
+
+fn dispatch_native_function_block(
+    ctx: &mut EvalContext<'_>,
+    _target_name: &SmolStr,
+    receiver_value: Option<Value>,
+    call_args: &[CallArg],
+) -> Result<Value, RuntimeError> {
+    let Some(Value::Instance(instance_id)) = receiver_value else {
+        return Err(RuntimeError::TypeMismatch);
+    };
+    let function_blocks = ctx.function_blocks.ok_or(RuntimeError::TypeMismatch)?;
+    let instance = ctx
+        .storage
+        .get_instance(instance_id)
+        .ok_or(RuntimeError::NullReference)?;
+    let key = SmolStr::new(instance.type_name.to_ascii_uppercase());
+    let function_block = function_blocks
+        .get(&key)
+        .ok_or_else(|| RuntimeError::UndefinedFunctionBlock(instance.type_name.clone()))?;
+    crate::eval::call_function_block(ctx, function_block, instance_id, call_args)?;
+    Ok(Value::Null)
+}
+
+fn dispatch_native_method(
+    ctx: &mut EvalContext<'_>,
+    target_name: &SmolStr,
+    receiver_value: Option<Value>,
+    call_args: &[CallArg],
+) -> Result<Value, RuntimeError> {
+    let Some(Value::Instance(instance_id)) = receiver_value else {
+        return Err(RuntimeError::TypeMismatch);
+    };
+    let method = expr::resolve_instance_method(ctx, instance_id, target_name)
+        .ok_or_else(|| RuntimeError::UndefinedField(target_name.clone()))?;
+    crate::eval::call_method(ctx, &method, instance_id, call_args)
 }
 
 fn native_receiver_count(kind: u32) -> Result<usize, VmTrap> {

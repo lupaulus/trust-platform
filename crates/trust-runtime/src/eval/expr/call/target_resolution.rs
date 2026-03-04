@@ -13,7 +13,7 @@ pub(super) fn call_target_name(expr: &Expr) -> Option<SmolStr> {
     }
 }
 
-pub(super) fn resolve_using_function<'a>(
+pub(crate) fn resolve_using_function<'a>(
     functions: &'a indexmap::IndexMap<SmolStr, crate::eval::FunctionDef>,
     name: &str,
     using: &[SmolStr],
@@ -28,7 +28,7 @@ pub(super) fn resolve_using_function<'a>(
     None
 }
 
-pub(super) fn resolve_instance_method(
+pub(crate) fn resolve_instance_method(
     ctx: &EvalContext<'_>,
     instance_id: InstanceId,
     name: &SmolStr,

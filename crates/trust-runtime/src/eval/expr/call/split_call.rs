@@ -1,4 +1,4 @@
-pub(super) fn eval_split_call(
+pub(crate) fn eval_split_call(
     ctx: &mut EvalContext<'_>,
     name: &str,
     args: &[CallArg],
