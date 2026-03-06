@@ -6,7 +6,19 @@ The format is based on Keep a Changelog and this project adheres to Semantic Ver
 
 ## [Unreleased]
 
-Target release: `v0.9.26`
+Target release: `v0.9.27`
+
+### Changed
+
+- MP-060 production backend policy now enforces VM-only startup for `trust-runtime run`/`play`: `--execution-backend` accepts `vm` only, `runtime.execution_backend='interpreter'` is rejected by runtime config validation, omitted backend config defaults to `vm`, and run/play startup now fails fast when a legacy interpreter backend is present in runtime bundle settings.
+- MP-060 setup/wizard runtime templates now emit `runtime.execution_backend = "vm"` by default so newly generated `runtime.toml` files validate and start under VM-only production policy.
+- MP-060 no-bundle and source-compiled runtime startup now always applies compiled bytecode before execution backend selection so VM-only startup has loaded bytecode metadata in both project and IDE-shell startup flows.
+- MP-060 interpreter internals are now explicitly feature-gated behind `legacy-interpreter` for parity-only workflows (differential/benchmark/debug parity tests), while default production builds remain VM-only.
+- MP-060 runtime/harness defaults now execute through VM paths with automatic bytecode materialization from runtime metadata when VM bytecode has not been preloaded, preventing implicit interpreter execution in default runtime/test flows.
+- MP-060 CI now enforces a production backend leak guard (`scripts/runtime_vm_production_backend_guard.sh`) to fail if run/config/control/template/runtime-default surfaces regress to interpreter references.
+- MP-060 migration/docs/checklists updated for restart execution: added detailed recovery board `docs/internal/testing/checklists/mp-060-vm-restart-recovery-checklist.md` and updated backend migration/spec/master-plan text to reflect interpreter test-oracle-only policy.
+- MP-060 post-C1 recovery pass implemented for register VM hot path (`P0 -> P2 -> P1`): boxed large runtime value variants (`Array`/`Struct`/`Enum` with unboxed `Reference`), added extended register-op fusion (`BinaryRefToRef`, `BinaryRefConstToRef`, `BinaryConstRefToRef`, `CmpRefConstJumpIf`) with tier-1 specialized-executor support, and added consume-aware per-block register read paths; refreshed locked `mp-060-corpus-v3` 3-run benchmark evidence and comparison artifacts in `target/gate-artifacts/runtime-vm-bench-v3-post-p0-p2-p1-run1/`.
+- MP-060 post-hotpath correction pass: `execution-backend` benchmark corpus upgraded to `mp-060-corpus-v4` with per-cycle loop-state reset in `loop-arith`, VM profile guardrails now assert loop-body execution during measured cycles, benchmark comparison now uses 3-run median-of-runs decision metrics (`scripts/runtime_vm_bench_compare.sh`) with aggregate median derived from per-fixture medians (instead of pooled cross-fixture sample p50), and register-IR `CALL_NATIVE` now reuses a program-level pooled operand stack (removing per-call stack allocation churn) alongside cached per-program read metadata and direct block-id indexing in the register executor.
 
 ### Added
 
@@ -22,6 +34,9 @@ Target release: `v0.9.26`
 - MP-060 Phase E online-change groundwork for `trust-runtime`: hot-reload semantics are now centralized in a dedicated runtime online-change contract (`apply_online_change_bytes`) with cycle-boundary swap handling, warm-restart entrypoint invalidation, retain/global/instance migration coverage, deterministic invalid-bytecode diagnostics, and explicit startup-only backend-switch diagnostics for live `config.set` requests.
 - MP-060 Phase E rollout-gate closure: added a dedicated backend migration note (`docs/guides/RUNTIME_EXECUTION_BACKEND_MIGRATION.md`) covering CLI/config rollback controls and the two-release interpreter compatibility window policy, plus explicit release-evidence gate documentation for `version-release-guard` artifact aggregation.
 - MP-060 benchmark groundwork: added `trust-runtime bench execution-backend` (`mp-060-corpus-v1`) for interpreter-vs-VM cycle latency/throughput comparison, plus CI evidence capture via `scripts/runtime_vm_bench_gate.sh` and published artifact/docs pointers (`gate-artifacts/runtime-vm-bench/**`, `docs/internal/reports/mp-060-runtime-vm-benchmark-corpus.md`).
+- MP-060 Phase C hotspot profiling: added runtime-scoped register-VM profile controls/snapshot APIs and extended `trust-runtime bench execution-backend` fixture reports with `vm_profile` details (register execution/fallback counters, fallback reasons, top hot blocks, and profiling-overhead ratio).
+- MP-060 Phase D tier-1 specialized register-executor pilot: added an experimental hot-block specialization tier in the register VM (guarded compile subset for arithmetic/compare/branch, deopt-to-register-interpreter fallback, cache capacity/eviction controls, and bytecode-reload invalidation), plus benchmark artifact fields for tier-1 specialized-executor counters/deopt reasons and focused unit coverage for startup/deopt/cache behavior.
+- MP-060 register executor now caches lowered register IR per `(module,pou)` with runtime-owned invalidation on bytecode reload, eliminating per-cycle relowering and block-map allocation; benchmark reporting now includes lowering-cache hit/miss/eviction stats and uses expanded `mp-060-corpus-v2` fixtures (`call-binding`, `string-stdlib`, `refs-sizeof`, `loop-arith`).
 - IDE settings coverage expanded for standalone/offline authoring: new fields for control endpoint/resource name, runtime cloud profile, extended OPC UA options, and observability options.
 - IDE settings discoverability improvements: `/ide/settings` now opens in an `All Settings` view by default and adds filter-by-name/key search so MQTT/PLC/TLS/realtime/debug configuration is immediately accessible.
 - IDE settings reliability hardening: `/ide/settings` now includes standalone `simulation.toml` controls (`simulation.enabled`, `simulation.seed`, `simulation.time_scale`), shows active filter summary/clear controls to prevent hidden-field confusion, and limits live `config.set` writes to backend-supported keys to avoid false save failures.

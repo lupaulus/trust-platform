@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-OUT_DIR="${OUT_DIR:-target/gate-artifacts/runtime-vm-bench}"
+BENCH_OUT_DIR="${TRUST_VM_BENCH_ARTIFACT_DIR:-${OUT_DIR:-target/gate-artifacts/runtime-vm-bench}}"
 PROFILE="${TRUST_VM_BENCH_PROFILE:-quick}"
 ENFORCE_THRESHOLDS="${TRUST_VM_BENCH_ENFORCE_THRESHOLDS:-0}"
 CARGO_PROFILE="${TRUST_VM_BENCH_CARGO_PROFILE:-debug}"
@@ -28,7 +28,10 @@ case "${PROFILE}" in
     ;;
 esac
 
-mkdir -p "${OUT_DIR}"
+mkdir -p "${BENCH_OUT_DIR}"
+
+# Avoid leaking benchmark artifact OUT_DIR into cargo/rustc build script env.
+unset OUT_DIR
 
 case "${CARGO_PROFILE}" in
   debug|release)
@@ -39,9 +42,9 @@ case "${CARGO_PROFILE}" in
     ;;
 esac
 
-cargo_args=(run -p trust-runtime --bin trust-runtime --)
+cargo_args=(run -p trust-runtime --bin trust-runtime --features legacy-interpreter --)
 if [[ "${CARGO_PROFILE}" == "release" ]]; then
-  cargo_args=(run --release -p trust-runtime --bin trust-runtime --)
+  cargo_args=(run --release -p trust-runtime --bin trust-runtime --features legacy-interpreter --)
 fi
 
 echo "[vm-bench-gate] running trust-runtime bench execution-backend (profile=${PROFILE}, cargo_profile=${CARGO_PROFILE})"
@@ -51,7 +54,7 @@ cargo "${cargo_args[@]}" \
   --samples "${SAMPLES}" \
   --warmup-cycles "${WARMUP_CYCLES}" \
   --output json \
-  > "${OUT_DIR}/execution-backend.json"
+  > "${BENCH_OUT_DIR}/execution-backend.json"
 duration_ms="$(( ($(date +%s%N) - started_ns) / 1000000 ))"
 
 read_json_number() {
@@ -72,9 +75,9 @@ float_ge() {
   awk -v a="${left}" -v b="${right}" 'BEGIN { exit (a >= b) ? 0 : 1 }'
 }
 
-MEDIAN_RATIO="$(read_json_number "${OUT_DIR}/execution-backend.json" '.report.aggregate.median_latency_ratio')"
-P99_RATIO="$(read_json_number "${OUT_DIR}/execution-backend.json" '.report.aggregate.p99_latency_ratio')"
-THROUGHPUT_RATIO="$(read_json_number "${OUT_DIR}/execution-backend.json" '.report.aggregate.throughput_ratio')"
+MEDIAN_RATIO="$(read_json_number "${BENCH_OUT_DIR}/execution-backend.json" '.report.aggregate.median_latency_ratio')"
+P99_RATIO="$(read_json_number "${BENCH_OUT_DIR}/execution-backend.json" '.report.aggregate.p99_latency_ratio')"
+THROUGHPUT_RATIO="$(read_json_number "${BENCH_OUT_DIR}/execution-backend.json" '.report.aggregate.throughput_ratio')"
 
 RESULT="recorded"
 if [[ "${ENFORCE_THRESHOLDS}" == "1" ]]; then
@@ -93,7 +96,7 @@ if [[ "${ENFORCE_THRESHOLDS}" == "1" ]]; then
   RESULT="pass"
 fi
 
-cat > "${OUT_DIR}/summary.md" <<MD
+cat > "${BENCH_OUT_DIR}/summary.md" <<MD
 # MP-060 Runtime Execution Backend Benchmark
 
 - profile: ${PROFILE}
@@ -140,6 +143,6 @@ jq -n \
     },
     thresholds_enforced: ($enforced == "1"),
     result: $result
-  }' > "${OUT_DIR}/summary.json"
+  }' > "${BENCH_OUT_DIR}/summary.json"
 
 echo "[vm-bench-gate] ${RESULT^^}"

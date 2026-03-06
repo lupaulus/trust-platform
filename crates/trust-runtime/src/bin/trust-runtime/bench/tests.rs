@@ -10,6 +10,14 @@ fn summarize_ns_computes_quantiles() {
     assert!((summary.max_us - 5.0).abs() < f64::EPSILON);
 }
 
+#[cfg(feature = "legacy-interpreter")]
+#[test]
+fn aggregate_median_uses_median_of_fixture_ratios() {
+    let ratios = [0.739, 1.334, 1.280, 0.754, 0.534];
+    let aggregate = median_of_fixture_ratios(&ratios);
+    assert!((aggregate - 0.754).abs() < f64::EPSILON);
+}
+
 #[test]
 fn histogram_includes_overflow_bucket() {
     let histogram = histogram_from_ns(&[1_000, 2_000, 30_000_000]);
@@ -91,6 +99,7 @@ fn mesh_workload_rejects_out_of_range_rates() {
     assert!(err.to_string().contains("--reorder-rate"));
 }
 
+#[cfg(feature = "legacy-interpreter")]
 #[test]
 fn execution_backend_bench_json_output_contains_ratio_fields() {
     let (report, format) = execute_bench(BenchAction::ExecutionBackend {
@@ -109,7 +118,7 @@ fn execution_backend_bench_json_output_contains_ratio_fields() {
         value
             .pointer("/report/corpus")
             .and_then(serde_json::Value::as_str),
-        Some("mp-060-corpus-v1")
+        Some("mp-060-corpus-v4")
     );
     assert!(value
         .pointer("/report/aggregate/median_latency_ratio")
@@ -119,4 +128,111 @@ fn execution_backend_bench_json_output_contains_ratio_fields() {
         .pointer("/report/aggregate/throughput_ratio")
         .and_then(serde_json::Value::as_f64)
         .is_some());
+    assert!(value
+        .pointer("/report/fixtures/0/vm_profile/register_programs_executed")
+        .and_then(serde_json::Value::as_u64)
+        .is_some());
+    assert!(value
+        .pointer("/report/fixtures/0/vm_profile/profiling_overhead_ratio")
+        .and_then(serde_json::Value::as_f64)
+        .is_some());
+    assert!(value
+        .pointer("/report/fixtures/0/vm_profile/register_lowering_cache/hits")
+        .and_then(serde_json::Value::as_u64)
+        .is_some());
+    assert!(value
+        .pointer("/report/fixtures/0/vm_profile/register_lowering_cache/hit_ratio")
+        .and_then(serde_json::Value::as_f64)
+        .is_some());
+    assert!(value
+        .pointer("/report/fixtures/0/vm_profile/tier1_specialized_executor")
+        .is_none());
+
+    let fixtures = value
+        .pointer("/report/fixtures")
+        .and_then(serde_json::Value::as_array)
+        .expect("fixtures array");
+    let call_heavy = fixtures
+        .iter()
+        .find(|fixture| {
+            fixture
+                .pointer("/fixture")
+                .and_then(serde_json::Value::as_str)
+                == Some("call-heavy-callee-arith")
+        })
+        .expect("call-heavy-callee-arith fixture");
+    assert!(
+        call_heavy
+            .pointer("/vm_profile/register_programs_executed")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or_default()
+            > 0
+    );
+    assert_eq!(
+        call_heavy
+            .pointer("/vm_profile/register_program_fallbacks")
+            .and_then(serde_json::Value::as_u64),
+        Some(0)
+    );
+
+    let loop_arith = fixtures
+        .iter()
+        .find(|fixture| {
+            fixture
+                .pointer("/fixture")
+                .and_then(serde_json::Value::as_str)
+                == Some("loop-arith")
+        })
+        .expect("loop-arith fixture");
+    let loop_body_hits = loop_arith
+        .pointer("/vm_profile/hot_blocks")
+        .and_then(serde_json::Value::as_array)
+        .map(|blocks| {
+            blocks
+                .iter()
+                .filter(|entry| {
+                    entry
+                        .get("block_id")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or_default()
+                        != 0
+                })
+                .map(|entry| {
+                    entry
+                        .get("hits")
+                        .and_then(serde_json::Value::as_u64)
+                        .unwrap_or_default()
+                })
+                .sum::<u64>()
+        })
+        .unwrap_or_default();
+    let loop_executed = loop_arith
+        .pointer("/vm_profile/register_programs_executed")
+        .and_then(serde_json::Value::as_u64)
+        .unwrap_or_default();
+    assert!(
+        loop_body_hits > loop_executed,
+        "loop-arith body must execute during measured cycles (body_hits={loop_body_hits}, executed={loop_executed})"
+    );
+}
+
+#[cfg(feature = "legacy-interpreter")]
+#[test]
+fn execution_backend_harness_selects_requested_backend() {
+    let fixture = EXECUTION_BACKEND_CORPUS
+        .first()
+        .expect("execution-backend corpus fixture");
+    let interpreter = harness_for_backend(fixture.source, ExecutionBackend::Interpreter)
+        .expect("build interpreter harness");
+    assert_eq!(
+        interpreter.runtime().execution_backend(),
+        ExecutionBackend::Interpreter
+    );
+
+    let vm = harness_for_backend(fixture.source, ExecutionBackend::BytecodeVm)
+        .expect("build vm harness");
+    assert_eq!(
+        vm.runtime().execution_backend(),
+        ExecutionBackend::BytecodeVm
+    );
 }
