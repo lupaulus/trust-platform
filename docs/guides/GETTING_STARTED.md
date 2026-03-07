@@ -41,7 +41,7 @@ Type `/help` to see available commands.
 
 Open the URL printed by the CLI. You should see the Overview page.
 
-![Runtime overview](../assets/ui-overview.png)
+![Runtime overview](../internal/assets/ui-overview.png)
 
 Expected outcome:
 - State shows **running**.
@@ -63,7 +63,7 @@ Expected outcome:
 
 Use the Setup button in the top bar or the “Finish setup” banner.
 
-![Setup wizard](../assets/ui-setup.png)
+![Setup wizard](../internal/assets/ui-setup.png)
 
 Recommended first‑run values:
 - PLC name: meaningful device name (example: `line_a_plc`)
@@ -78,7 +78,7 @@ Expected outcome:
 
 Open the I/O page to confirm inputs/outputs are visible.
 
-![I/O page](../assets/ui-io.png)
+![I/O page](../internal/assets/ui-io.png)
 
 Expected outcome:
 - Inputs/Outputs are listed.

@@ -134,6 +134,18 @@ fn stream_pipe_to_job<R: std::io::Read + Send + 'static>(
     })
 }
 
+fn configure_ide_task_command(command: &mut Command, kind: &str, project_root: &Path) {
+    if kind == "build" {
+        // Keep parity with CLI: `trust-runtime build --project <root>`
+        // and let runtime resolve sources from `<project>/src` by default.
+        command.arg("build").arg("--project").arg(project_root);
+    } else if kind == "validate" {
+        command.arg("validate").arg("--project").arg(project_root);
+    } else {
+        command.arg("test").arg("--project").arg(project_root);
+    }
+}
+
 pub(super) fn start_ide_task_job(
     kind: &str,
     project_root: PathBuf,
@@ -170,24 +182,7 @@ pub(super) fn start_ide_task_job(
             }
         };
         let mut command = Command::new(exe);
-        if kind_text == "build" {
-            command
-                .arg("build")
-                .arg("--project")
-                .arg(project_root.as_os_str())
-                .arg("--sources")
-                .arg("src");
-        } else if kind_text == "validate" {
-            command
-                .arg("validate")
-                .arg("--project")
-                .arg(project_root.as_os_str());
-        } else {
-            command
-                .arg("test")
-                .arg("--project")
-                .arg(project_root.as_os_str());
-        }
+        configure_ide_task_command(&mut command, kind_text.as_str(), project_root.as_path());
         command
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -273,5 +268,16 @@ mod tests {
         assert_eq!(parsed.len(), 2);
         assert_eq!(parsed[0].path, "main.st");
         assert_eq!(parsed[1].path, "folder/aux.st");
+    }
+
+    #[test]
+    fn build_task_command_matches_cli_project_only_contract() {
+        let mut command = Command::new("trust-runtime");
+        configure_ide_task_command(&mut command, "build", Path::new("/tmp/project"));
+        let args = command
+            .get_args()
+            .map(|value| value.to_string_lossy().to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(args, vec!["build", "--project", "/tmp/project"]);
     }
 }

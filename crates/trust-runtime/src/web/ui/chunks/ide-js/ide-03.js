@@ -100,6 +100,10 @@
       closePalette();
       return;
     }
+    if (event.key === "Escape" && el.moreActionsBtn && el.moreActionsBtn.getAttribute("aria-expanded") === "true") {
+      closeMoreActionsMenu();
+      return;
+    }
     if (event.key === "Escape" && !el.treeContextMenu.classList.contains("ide-hidden")) {
       closeTreeContextMenu();
     }

@@ -65,6 +65,61 @@ policy = "halt"
 }
 
 #[test]
+fn apply_deploy_normalizes_src_prefixed_source_paths() {
+    let mut root = std::env::temp_dir();
+    root.push(format!("trust-deploy-src-prefix-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&root);
+    fs::create_dir_all(&root).unwrap();
+    let request = DeployRequest {
+        runtime_toml: Some(
+            r#"
+[bundle]
+version = 1
+
+[resource]
+name = "main"
+cycle_interval_ms = 100
+
+[runtime.control]
+endpoint = "unix:///tmp/trust-runtime.sock"
+mode = "production"
+debug_enabled = false
+
+[runtime.log]
+level = "info"
+
+[runtime.retain]
+mode = "none"
+save_interval_ms = 1000
+
+[runtime.watchdog]
+enabled = false
+timeout_ms = 5000
+action = "halt"
+
+[runtime.fault]
+policy = "halt"
+"#
+            .to_string(),
+        ),
+        io_toml: None,
+        program_stbc_b64: None,
+        sources: Some(vec![DeploySource {
+            path: "src/main.st".to_string(),
+            content: "PROGRAM Main\nEND_PROGRAM\n".to_string(),
+        }]),
+        signature: None,
+        restart: None,
+    };
+    let result = apply_deploy(&root, request).expect("deploy should pass");
+    assert!(result.written.contains(&"runtime.toml".to_string()));
+    assert!(result.written.contains(&"src/main.st".to_string()));
+    assert!(root.join("src/main.st").exists());
+    assert!(!root.join("src/src/main.st").exists());
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn apply_deploy_rejects_invalid_runtime_schema() {
     let mut root = std::env::temp_dir();
     root.push(format!("trust-deploy-invalid-{}", std::process::id()));

@@ -80,8 +80,46 @@ async function apiJson(url, options = {}) {
 
 // ── Event Binding ──────────────────────────────────────
 
+function closeMoreActionsMenu() {
+  if (!el.moreActionsMenu || !el.moreActionsBtn || !el.headerMoreActions) return;
+  el.moreActionsMenu.hidden = true;
+  el.moreActionsBtn.setAttribute("aria-expanded", "false");
+  el.headerMoreActions.classList.remove("open");
+}
+
+function openMoreActionsMenu() {
+  if (!el.moreActionsMenu || !el.moreActionsBtn || !el.headerMoreActions) return;
+  el.moreActionsMenu.hidden = false;
+  el.moreActionsBtn.setAttribute("aria-expanded", "true");
+  el.headerMoreActions.classList.add("open");
+}
+
+function bindHeaderOverflowMenu() {
+  if (!el.moreActionsBtn || !el.moreActionsMenu || !el.headerMoreActions) return;
+
+  el.moreActionsBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const expanded = el.moreActionsBtn.getAttribute("aria-expanded") === "true";
+    if (expanded) {
+      closeMoreActionsMenu();
+    } else {
+      openMoreActionsMenu();
+    }
+  });
+
+  el.moreActionsMenu.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.closest("button")) {
+      closeMoreActionsMenu();
+    }
+  });
+}
+
 function bindGlobalEvents() {
   bindResizeHandles();
+  bindHeaderOverflowMenu();
 
   // DRY: action bindings
   bindAction(el.saveBtn, () => saveActiveTab({explicit: true}));
@@ -267,6 +305,12 @@ function bindGlobalEvents() {
   });
 
   document.addEventListener("click", (event) => {
+    if (el.moreActionsBtn && el.moreActionsBtn.getAttribute("aria-expanded") === "true") {
+      const target = event.target;
+      if (!(target instanceof Node) || !el.headerMoreActions || !el.headerMoreActions.contains(target)) {
+        closeMoreActionsMenu();
+      }
+    }
     if (!el.treeContextMenu.classList.contains("ide-hidden")) {
       const target = event.target;
       if (target instanceof Node && !el.treeContextMenu.contains(target)) {

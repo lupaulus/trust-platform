@@ -117,10 +117,10 @@ pub fn apply_deploy(
     if let Some(sources) = request.sources {
         let sources_root = bundle_root.join("src");
         for source in sources {
-            let rel = sanitize_relative_path(&source.path).ok_or_else(|| {
+            let rel = normalize_source_path_for_bundle(&source.path).ok_or_else(|| {
                 RuntimeError::ControlError(format!("invalid source path: {}", source.path).into())
             })?;
-            let dest = sources_root.join(rel);
+            let dest = sources_root.join(&rel);
             if let Some(parent) = dest.parent() {
                 fs::create_dir_all(parent).map_err(|err| {
                     RuntimeError::ControlError(format!("create src dir: {err}").into())
@@ -129,7 +129,8 @@ pub fn apply_deploy(
             fs::write(&dest, source.content).map_err(|err| {
                 RuntimeError::ControlError(format!("write source {}: {err}", dest.display()).into())
             })?;
-            written.push(format!("src/{}", source.path));
+            let rel_text = rel.to_string_lossy().replace('\\', "/");
+            written.push(format!("src/{rel_text}"));
         }
     }
     if written.is_empty() {
@@ -369,6 +370,19 @@ fn sanitize_relative_path(path: &str) -> Option<PathBuf> {
     } else {
         Some(clean)
     }
+}
+
+fn normalize_source_path_for_bundle(path: &str) -> Option<PathBuf> {
+    let rel = sanitize_relative_path(path)?;
+    // Accept both `main.st` and `src/main.st` payload paths, but always write
+    // under `<project>/src/<relative>`.
+    if let Ok(stripped) = rel.strip_prefix("src") {
+        if stripped.as_os_str().is_empty() {
+            return None;
+        }
+        return Some(stripped.to_path_buf());
+    }
+    Some(rel)
 }
 
 #[cfg(test)]

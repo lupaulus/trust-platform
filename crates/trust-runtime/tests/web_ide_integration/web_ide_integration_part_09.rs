@@ -62,6 +62,36 @@ fn unified_shell_tab_deep_links_serve_ide_html() {
 }
 
 #[test]
+fn unified_shell_header_uses_compact_toolbar_with_overflow_menu() {
+    let project = make_project("compact-toolbar");
+    let state = control_state(source_fixture(), ControlMode::Debug, None);
+    let base = start_test_server(state, project.clone(), WebAuthMode::Local);
+
+    let mut response = ureq::get(&format!("{base}/ide"))
+        .call()
+        .expect("fetch /ide");
+    let body = response.body_mut().read_to_string().expect("read /ide");
+
+    for id in [
+        "id=\"openProjectBtn\"",
+        "id=\"saveBtn\"",
+        "id=\"buildBtn\"",
+        "id=\"deployBtn\"",
+        "id=\"moreActionsBtn\"",
+        "id=\"moreActionsMenu\"",
+        "id=\"quickOpenBtn\"",
+        "id=\"cmdPaletteBtn\"",
+        "id=\"saveAllBtn\"",
+        "id=\"validateBtn\"",
+        "id=\"testBtn\"",
+    ] {
+        assert!(body.contains(id), "toolbar html must contain {id}");
+    }
+
+    let _ = std::fs::remove_dir_all(project);
+}
+
+#[test]
 fn unified_shell_serves_all_ide_tab_modules() {
     let project = make_project("tab-modules");
     let state = control_state(source_fixture(), ControlMode::Debug, None);
@@ -98,6 +128,44 @@ fn unified_shell_serves_all_ide_tab_modules() {
     assert!(
         cytoscape.len() > 1000,
         "cytoscape.min.js must be a large library"
+    );
+
+    let _ = std::fs::remove_dir_all(project);
+}
+
+#[test]
+fn unified_shell_online_module_defaults_connection_to_same_origin_and_auto_connects() {
+    let project = make_project("online-default-connect");
+    let state = control_state(source_fixture(), ControlMode::Debug, None);
+    let base = start_test_server(state, project.clone(), WebAuthMode::Local);
+
+    let mut response = ureq::get(&format!("{base}/ide/modules/ide-online.js"))
+        .call()
+        .expect("fetch ide-online.js");
+    let body = response
+        .body_mut()
+        .read_to_string()
+        .expect("read ide-online.js");
+
+    assert!(
+        body.contains("function onlineDefaultConnectPort()"),
+        "online module must expose derived default port helper"
+    );
+    assert!(
+        body.contains("window.location.port"),
+        "online module must derive connection defaults from current page origin"
+    );
+    assert!(
+        body.contains("function onlineSeedConnectionDefaults()"),
+        "online module must seed connection dialog defaults from current origin"
+    );
+    assert!(
+        body.contains("if (!currentPort || currentPort === \"18080\")"),
+        "online module must migrate stale legacy 18080 default to current origin port"
+    );
+    assert!(
+        body.contains("void onlineConnect(withPort, null, { silent: true });"),
+        "online module must auto-connect silently at startup in same-origin runtime mode"
     );
 
     let _ = std::fs::remove_dir_all(project);

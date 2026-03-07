@@ -236,6 +236,8 @@ body[data-theme="dark"] {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  align-items: center;
+  position: relative;
 }
 
 .ide-top-actions button {
@@ -255,11 +257,52 @@ body[data-theme="dark"] {
   vertical-align: -2px;
 }
 
+.ide-action-label {
+  font-size: 12px;
+  line-height: 1;
+}
+
 .ide-toolbar-separator {
   width: 1px;
   height: 20px;
   background: var(--border);
   align-self: center;
+}
+
+.ide-overflow-actions {
+  position: relative;
+}
+
+.ide-overflow-actions .ide-overflow-trigger {
+  min-width: 94px;
+  justify-content: center;
+}
+
+.ide-overflow-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 45;
+  min-width: 190px;
+  max-width: min(90vw, 260px);
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.ide-overflow-menu .btn {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 8px 10px;
+  min-height: 34px;
+}
+
+.ide-overflow-menu .btn svg {
+  flex-shrink: 0;
 }
 
 /* ── Breadcrumbs ───────────────────────────────────── */

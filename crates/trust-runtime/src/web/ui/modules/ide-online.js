@@ -57,6 +57,46 @@ function onlineTargetDisplay(target) {
   return String(target || "").replace(/^https?:\/\//, "");
 }
 
+function onlineDefaultConnectAddress() {
+  const host = String(window.location.hostname || "").trim();
+  return host || "127.0.0.1";
+}
+
+function onlineDefaultConnectPort() {
+  const pagePort = String(window.location.port || "").trim();
+  if (pagePort) return pagePort;
+  return window.location.protocol === "https:" ? "443" : "80";
+}
+
+function onlineBuildConnectTarget(address, port) {
+  const host = String(address || "").trim();
+  if (!host) return null;
+  if (host.includes("://")) return host;
+
+  const portText = String(port || "").trim();
+  const isBareIpv6Literal = host.includes(":") && host.split(":").length > 2
+    && !host.startsWith("[") && !host.includes("]");
+  if (isBareIpv6Literal) {
+    return portText ? `[${host}]:${portText}` : `[${host}]`;
+  }
+  if (host.includes(":")) return host;
+  return portText ? `${host}:${portText}` : host;
+}
+
+function onlineSeedConnectionDefaults() {
+  if (!el.connectAddress || !el.connectPort) return;
+
+  const currentAddress = String(el.connectAddress.value || "").trim().toLowerCase();
+  const currentPort = String(el.connectPort.value || "").trim();
+
+  if (!currentAddress || currentAddress === "127.0.0.1" || currentAddress === "localhost") {
+    el.connectAddress.value = onlineDefaultConnectAddress();
+  }
+  if (!currentPort || currentPort === "18080") {
+    el.connectPort.value = onlineDefaultConnectPort();
+  }
+}
+
 function onlineIsRemoteTarget(target) {
   try {
     const parsed = new URL(String(target || ""));
@@ -433,17 +473,22 @@ async function onlineProbeTarget(target, credentials) {
   });
 }
 
-async function onlineConnect(address, name) {
+async function onlineConnect(address, name, options = {}) {
+  const silent = !!options.silent;
   const target = onlineNormalizeTarget(address);
   if (!target) {
-    if (typeof showIdeToast === "function") showIdeToast("Invalid runtime address.", "error");
-    return;
+    if (!silent && typeof showIdeToast === "function") {
+      showIdeToast("Invalid runtime address.", "error");
+    }
+    return false;
   }
 
   onlineState.dialogError = "";
-  onlineRenderDialogState();
+  if (!silent) {
+    onlineRenderDialogState();
+  }
 
-  if (el.connectBtn) {
+  if (!silent && el.connectBtn) {
     el.connectBtn.disabled = true;
     el.connectBtn.textContent = "Connecting...";
   }
@@ -485,17 +530,23 @@ async function onlineConnect(address, name) {
     onlineSaveRecent(onlineState.address, resolvedName);
     onlineStartStatusPolling();
     onlineUpdateStatusBar();
-    onlineRenderDialogState();
-    closeConnectionDialog();
+    if (!silent) {
+      onlineRenderDialogState();
+      closeConnectionDialog();
+    }
 
-    if (typeof showIdeToast === "function") {
+    if (!silent && typeof showIdeToast === "function") {
       showIdeToast(`Connected to ${resolvedName}`, "success");
     }
     setStatus(`Connected to ${resolvedName}`);
 
     onlineUpdateSyncStatus();
     onlineNotifyConnected(previous);
+    return true;
   } catch (err) {
+    if (silent) {
+      return false;
+    }
     const rawMessage = String(err?.message || err || "connection failed");
     const authRequired = rawMessage === "auth_required"
       || rawMessage.toLowerCase().includes("unauthorized")
@@ -512,8 +563,9 @@ async function onlineConnect(address, name) {
     if (typeof showIdeToast === "function") {
       showIdeToast(`Connection failed: ${message}`, "error");
     }
+    return false;
   } finally {
-    if (el.connectBtn) {
+    if (!silent && el.connectBtn) {
       el.connectBtn.disabled = false;
       el.connectBtn.textContent = "Connect";
     }
@@ -740,14 +792,18 @@ async function onlineDeployFlow() {
     const sources = [];
     if (Array.isArray(state?.files)) {
       for (const filePath of state.files) {
+        const normalizedPath = String(filePath || "").trim();
+        if (!normalizedPath || !normalizedPath.toLowerCase().endsWith(".st")) {
+          continue;
+        }
         try {
-          const content = await apiJson(`/api/ide/file?path=${encodeURIComponent(filePath)}`, {
+          const content = await apiJson(`/api/ide/file?path=${encodeURIComponent(normalizedPath)}`, {
             method: "GET",
             headers: apiHeaders(),
             timeoutMs: 3000,
           });
           if (content && content.content != null) {
-            sources.push({ path: filePath, content: content.content });
+            sources.push({ path: normalizedPath, content: content.content });
           }
         } catch {
           // Skip unreadable files
@@ -977,18 +1033,20 @@ function onlineUpdateSyncBadge() {
 // ── Init ───────────────────────────────────────────────
 
 function onlineInit() {
+  onlineSeedConnectionDefaults();
+
   if (el.connectionPill) {
     el.connectionPill.addEventListener("click", openConnectionDialog);
   }
   if (el.connectBtn) {
     el.connectBtn.addEventListener("click", () => {
       const addr = (el.connectAddress && el.connectAddress.value.trim()) || "";
-      const port = (el.connectPort && el.connectPort.value.trim()) || "18080";
+      const port = (el.connectPort && el.connectPort.value.trim()) || onlineDefaultConnectPort();
       if (addr) {
-        const withPort = addr.includes("://") || addr.includes(":")
-          ? addr
-          : `${addr}:${port}`;
-        onlineConnect(withPort);
+        const withPort = onlineBuildConnectTarget(addr, port);
+        if (withPort) {
+          void onlineConnect(withPort);
+        }
       }
     });
   }
@@ -1077,6 +1135,15 @@ function onlineInit() {
   onlineUpdateStatusBar();
   onlineUpdateSyncBadge();
   onlineRenderDialogState();
+
+  // In standard runtime mode, IDE and control endpoints share origin.
+  // Auto-connecting here removes manual connect friction and unlocks Deploy.
+  const addr = (el.connectAddress && el.connectAddress.value.trim()) || onlineDefaultConnectAddress();
+  const port = (el.connectPort && el.connectPort.value.trim()) || onlineDefaultConnectPort();
+  const withPort = onlineBuildConnectTarget(addr, port);
+  if (withPort) {
+    void onlineConnect(withPort, null, { silent: true });
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {

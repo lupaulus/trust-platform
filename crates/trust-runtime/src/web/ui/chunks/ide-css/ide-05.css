@@ -229,11 +229,17 @@ body[data-theme="dark"] .ide-tree-icon.file-json {
 @media (max-width: 760px) {
   .ide-top-actions {
     gap: 6px;
+    width: 100%;
   }
 
   .ide-top-actions button {
     min-height: 34px;
     padding: 8px 10px;
+  }
+
+  .ide-overflow-menu {
+    right: 0;
+    left: auto;
   }
 
   .ide-meta h1 {
@@ -267,5 +273,18 @@ body[data-theme="dark"] .ide-tree-icon.file-json {
 
   .ide-status-right {
     justify-content: space-between;
+  }
+}
+
+@media (max-width: 560px) {
+  .ide-top-actions > .btn .ide-action-label,
+  .ide-overflow-trigger .ide-action-label {
+    display: none;
+  }
+
+  .ide-overflow-actions .ide-overflow-trigger {
+    min-width: 40px;
+    padding-left: 10px;
+    padding-right: 10px;
   }
 }

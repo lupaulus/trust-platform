@@ -63,22 +63,39 @@
         <div id="headerSyncPopover" class="ide-sync-popover" role="dialog" aria-label="Sync status details" hidden></div>
       </div>
       <div class="ide-top-actions">
-        <button class="btn ghost" id="newProjectBtn" type="button" title="New Project" aria-label="Create new project"><svg width="16" height="16"><path d="M2 13V4a1 1 0 0 1 1-1h3.5l2 2H13a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M8 7v4M6 9h4"/></svg></button>
-        <button class="btn ghost" id="openProjectBtn" type="button" title="Open Folder" aria-label="Open project folder"><svg width="16" height="16"><path d="M2 13V4a1 1 0 0 1 1-1h3.5l2 2H13a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></svg></button>
-        <button class="btn ghost" id="quickOpenBtn" type="button" title="Quick Open" aria-label="Quick open file"><svg width="16" height="16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg></button>
-        <button class="btn ghost" id="cmdPaletteBtn" type="button" title="Command Palette" aria-label="Open command palette"><svg width="16" height="16"><path d="M4 4h8M4 8h8M4 12h5"/><path d="M12 10l2 2-2 2"/></svg></button>
-        <span class="ide-toolbar-separator"></span>
-        <button class="btn ghost" id="validateBtn" type="button" title="Validate" aria-label="Validate project"><svg width="16" height="16"><path d="M4 8l3 3 5-6"/><circle cx="8" cy="8" r="6.5" fill="none"/></svg></button>
-        <button class="btn ghost" id="buildBtn" type="button" title="Build" aria-label="Build project"><svg width="16" height="16"><path d="M3 10l4-7v5h3l-4 7v-5H3z"/></svg></button>
-        <button class="btn ghost" id="testBtn" type="button" title="Test" aria-label="Run project tests"><svg width="16" height="16"><path d="M5 3v10l8-5z"/></svg></button>
-        <button class="btn ghost" id="deployBtn" type="button" title="Deploy" aria-label="Deploy to runtime"><svg width="16" height="16"><path d="M8 2v9M5 8l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5"/></svg></button>
-        <span class="ide-toolbar-separator"></span>
-        <button class="btn ghost" id="liveValuesToggle" type="button" title="Live Values" aria-label="Toggle live variable values"><svg width="16" height="16"><circle cx="4" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="12" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.2"/></svg></button>
-        <span class="ide-toolbar-separator"></span>
-        <button class="btn ghost" id="splitBtn" type="button" title="Split" aria-label="Toggle split editor"><svg width="16" height="16"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M8 3v10"/></svg></button>
-        <button class="btn ghost" id="settingsBackToFormBtn" type="button" title="Back to Settings Form" aria-label="Back to settings form" hidden>Back to form view</button>
-        <button class="btn secondary" id="saveBtn" type="button" title="Save" aria-label="Save active file"><svg width="16" height="16"><path d="M3 3v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6l-3-3H4a1 1 0 0 0-1 1z"/><path d="M10 3v3h3"/><path d="M6 11h4"/></svg></button>
-        <button class="btn secondary" id="saveAllBtn" type="button" title="Save All" aria-label="Save all open files"><svg width="16" height="16"><path d="M3 3v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6l-3-3H4a1 1 0 0 0-1 1z"/><path d="M10 3v3h3"/><path d="M6 10h4M6 12h4"/></svg></button>
+        <button class="btn ghost" id="openProjectBtn" type="button" title="Open Folder" aria-label="Open project folder">
+          <svg width="16" height="16"><path d="M2 13V4a1 1 0 0 1 1-1h3.5l2 2H13a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/></svg>
+          <span class="ide-action-label">Open</span>
+        </button>
+        <button class="btn secondary" id="saveBtn" type="button" title="Save" aria-label="Save active file">
+          <svg width="16" height="16"><path d="M3 3v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6l-3-3H4a1 1 0 0 0-1 1z"/><path d="M10 3v3h3"/><path d="M6 11h4"/></svg>
+          <span class="ide-action-label">Save</span>
+        </button>
+        <button class="btn ghost" id="buildBtn" type="button" title="Build" aria-label="Build project">
+          <svg width="16" height="16"><path d="M3 10l4-7v5h3l-4 7v-5H3z"/></svg>
+          <span class="ide-action-label">Build</span>
+        </button>
+        <button class="btn ghost" id="deployBtn" type="button" title="Deploy" aria-label="Deploy to runtime">
+          <svg width="16" height="16"><path d="M8 2v9M5 8l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 13h10" stroke="currentColor" stroke-width="1.5"/></svg>
+          <span class="ide-action-label">Deploy</span>
+        </button>
+        <div class="ide-overflow-actions" id="headerMoreActions">
+          <button class="btn ghost ide-overflow-trigger" id="moreActionsBtn" type="button" title="More actions" aria-label="More actions" aria-expanded="false" aria-controls="moreActionsMenu">
+            <svg width="16" height="16"><circle cx="8" cy="3.5" r="1.2"/><circle cx="8" cy="8" r="1.2"/><circle cx="8" cy="12.5" r="1.2"/></svg>
+            <span class="ide-action-label">More</span>
+          </button>
+          <div class="ide-overflow-menu" id="moreActionsMenu" role="menu" hidden>
+            <button class="btn ghost" id="newProjectBtn" type="button" title="New Project" aria-label="Create new project" role="menuitem"><svg width="16" height="16"><path d="M2 13V4a1 1 0 0 1 1-1h3.5l2 2H13a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z"/><path d="M8 7v4M6 9h4"/></svg><span class="ide-action-label">New project</span></button>
+            <button class="btn ghost" id="quickOpenBtn" type="button" title="Quick Open" aria-label="Quick open file" role="menuitem"><svg width="16" height="16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5L14 14"/></svg><span class="ide-action-label">Quick open</span></button>
+            <button class="btn ghost" id="cmdPaletteBtn" type="button" title="Command Palette" aria-label="Open command palette" role="menuitem"><svg width="16" height="16"><path d="M4 4h8M4 8h8M4 12h5"/><path d="M12 10l2 2-2 2"/></svg><span class="ide-action-label">Commands</span></button>
+            <button class="btn secondary" id="saveAllBtn" type="button" title="Save All" aria-label="Save all open files" role="menuitem"><svg width="16" height="16"><path d="M3 3v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V6l-3-3H4a1 1 0 0 0-1 1z"/><path d="M10 3v3h3"/><path d="M6 10h4M6 12h4"/></svg><span class="ide-action-label">Save all</span></button>
+            <button class="btn ghost" id="validateBtn" type="button" title="Validate" aria-label="Validate project" role="menuitem"><svg width="16" height="16"><path d="M4 8l3 3 5-6"/><circle cx="8" cy="8" r="6.5" fill="none"/></svg><span class="ide-action-label">Validate</span></button>
+            <button class="btn ghost" id="testBtn" type="button" title="Test" aria-label="Run project tests" role="menuitem"><svg width="16" height="16"><path d="M5 3v10l8-5z"/></svg><span class="ide-action-label">Test</span></button>
+            <button class="btn ghost" id="liveValuesToggle" type="button" title="Live Values" aria-label="Toggle live variable values" role="menuitem"><svg width="16" height="16"><circle cx="4" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="12" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.2"/></svg><span class="ide-action-label">Live values</span></button>
+            <button class="btn ghost" id="splitBtn" type="button" title="Split" aria-label="Toggle split editor" role="menuitem"><svg width="16" height="16"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M8 3v10"/></svg><span class="ide-action-label">Split view</span></button>
+            <button class="btn ghost" id="settingsBackToFormBtn" type="button" title="Back to Settings Form" aria-label="Back to settings form" role="menuitem" hidden>Back to form view</button>
+          </div>
+        </div>
       </div>
     </header>
 
