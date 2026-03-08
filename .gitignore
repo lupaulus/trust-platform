@@ -94,3 +94,6 @@ docs/internal/testing/evidence/*
 !docs/internal/testing/evidence/ld-runtime-pane-parity-2026-02-27.md
 CLAUDE.md
 AGENTS.md
+
+# Handle project folder
+project
