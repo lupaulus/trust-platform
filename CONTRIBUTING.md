@@ -7,6 +7,8 @@ Thanks for taking the time to contribute. This project is early-stage and still 
 Prerequisites:
 - Rust 1.85+
 - Node.js 20+ (for the VS Code extension)
+- [sscache](https://github.com/mozilla/sccache) (for faster builds)
+- [just](https://github.com/casey/just) (modern make implementation)
 
 Clone and build:
 
