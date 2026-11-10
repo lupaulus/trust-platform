@@ -216,6 +216,7 @@ Beyond trust-hir's diagnostics, the build refuses with a diagnostic naming the c
 |---|---|---|---|---|
 | ESP32-C6 | RV32IMAC, 160 MHz | `riscv32imac-unknown-none-elf` | software (`REAL` and `LREAL`) | position-independent, medium-any |
 | STM32U5A9 | Cortex-M33, 160 MHz | `thumbv8m.main-none-eabihf` | hardware single (`REAL`), software `LREAL` | position-independent, Thumb |
+| AVR: ATmega328P, ATmega2560 | AVR 8-bit, 16 MHz | `avr-none` | software (`REAL`; `LREAL` only if the backend proves it, specification 34 D.6) | Harvard: `CODE` executes from flash, data is read with `LPM` (§8.2) |
 | Linux, Windows x86-64 | x86-64 | `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc` | SSE2 | position-independent |
 | Linux, macOS ARM64 | AArch64 | `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin` | hardware | position-independent |
 
@@ -234,6 +235,14 @@ reserves and may overwrite when it switches threads: no instruction of the linke
 neither the generated code nor the libraries it links (§4.5) nor the compiler's own functions it
 takes in.
 
+The AVR module (target id 5) is built for `avr-none` by the bundle's pinned nightly, the one target
+that needs one (§4.5, §4.6), and its entry points are `extern "C"` like the other bare-metal
+targets, with 16-bit pointers. The AVR is Harvard: the module's `CODE` and `RODATA` lie in its
+slot's flash, the program counter executes `CODE` from there directly, and no data load can read
+flash, so the generated code and the libraries read `RODATA`, constants and string literals through
+the kernel interface's flash-read functions, and the kernel reads the image's table sections the
+same way (§5.1, §8.2).
+
 ### 4.5 Compiler flags
 
 Fixed for every target, in the toolchain bundle's manifest, and recorded in the image header:
@@ -249,7 +258,11 @@ Fixed for every target, in the toolchain bundle's manifest, and recorded in the 
 --cfg trust_module
 ```
 
-No `-Z` flag is used: the build runs on stable rustc only. The module is linked as a static
+No `-Z` flag is used on the stable rustc: every module target but `avr-none` builds on the pinned
+stable rustc only. The `avr-none` target is tier 3 and no stable release ships `rust-std` for it,
+so its module builds with the bundle's pinned nightly and `-Z build-std=core,compiler_builtins`
+(owner, 10 November 2026; §4.6), and the image header's compiler version names that nightly for
+its modules. The module is linked as a static
 position-independent executable, so that an absolute address anywhere in it would be a dynamic
 relocation, which the image builder refuses (§5.3); a module that links has none. The program
 library and the interface crates are compiled for each target with the same relocation model, abort
@@ -304,7 +317,9 @@ with a new bundle, and the tools say "rebuild needed" for every project (§10.2)
 
 The bundle is built from the official Rust release of the pinned version. The pinned version is
 recorded in `rust-toolchain.toml` of the repository and in each image's header; CI builds the
-bundle and the kernel from the same version.
+bundle and the kernel from the same version. The AVR module target's pinned nightly (owner,
+10 November 2026) is recorded in the bundle's manifest and in the AVR firmware crates' own
+`rust-toolchain.toml`, which lie outside the workspace.
 
 **The bundle.** A bundle is a gzip-compressed tar archive, `trust-toolchain-<platform>.tar.gz`,
 for each platform the release builds the tools for: `linux-x64`, `linux-arm64`, `darwin-x64`,
@@ -314,9 +329,12 @@ for each platform the release builds the tools for: `linux-x64`, `linux-arm64`, 
   with the libraries the compiler loads: `lib/*.so*` on Linux, `lib/*.dylib` on macOS, `bin/*.dll`
   on Windows;
 - for each module target of §4.4, `riscv32imac-unknown-none-elf`, `thumbv8m.main-none-eabihf`,
-  `x86_64-unknown-linux-gnu` and `aarch64-unknown-linux-gnu`, the parts of `rust-std` that a
-  freestanding module links, `core` and `compiler_builtins`, in `lib/rustlib/<target>/lib/`, where
-  the compiler finds them beside itself;
+  `x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu` and `avr-none`, the parts of `rust-std`
+  that a freestanding module links, `core` and `compiler_builtins`, in `lib/rustlib/<target>/lib/`,
+  where the compiler finds them beside itself; for `avr-none` the parts come from the pinned
+  nightly's `-Z build-std` build (§4.5), and the manifest's entry for that target marks
+  `"nightly": true` and names the nightly's version, while every other target's entry names the
+  pinned stable release;
 - for each module target, the interface and program library crates and the crates they link, with
   `LIBRARY`, in `lib/<target>/`;
 - `manifest.json`: `format` (1), `trust` (the truST version, the kernel's), `platform`, `rustc`
@@ -376,7 +394,10 @@ The image is one file, `TRSTI001`, little-endian, every section aligned to 8 byt
 size of a program slot on the device it is built for. Its layout is fixed so that a device reads it
 where it lies in flash (the C6 through its MMU window, the U5A9 directly, a computer from a mapped
 file) without copying: every table is an array of fixed-size records, every string is in the string
-pool at an offset, every offset is relative to the start of the image.
+pool at an offset, every offset is relative to the start of the image. An AVR cannot read flash with
+a data load, so it reads the image's tables byte by byte with `LPM` through the kernel interface's
+flash-read functions (§8.2), while its module's `CODE` executes from the slot's flash directly,
+since the program counter reads flash; the module's `RODATA` is read the same way (§4.4).
 
 ### 5.2 Header (128 bytes)
 
@@ -387,7 +408,7 @@ pool at an offset, every offset is relative to the start of the image.
 | 12 | 4 | Total length L of the image |
 | 16 | 2 | Image format version, 4 (0.13: the 16-byte retain map of §5.10; 0.32: a function block's or class's base and interfaces in the type table, §5.8; 0.35: a symbol's `noinit` and `hide` marks and a global's owner, §5.7, and a member's `hide` mark, §5.8) |
 | 18 | 2 | Kernel interface version (§8.2) the module was built against |
-| 20 | 4 | Target id (§4.4: 1 rv32imac, 2 thumbv8m.main-hf, 3 x86-64, 4 aarch64) |
+| 20 | 4 | Target id (§4.4: 1 rv32imac, 2 thumbv8m.main-hf, 3 x86-64, 4 aarch64, 5 avr) |
 | 24 | 8 | Build time, Unix seconds (informational, excluded from NX-07) |
 | 32 | 32 | SHA-256 of the project's sources: each source's label (§5.3), a zero byte, its text and a zero byte, in the order of the labels, so that the same sources give the same hash on every computer; the settings are identified by the deployment record (§10.1) |
 | 64 | 32 | Rust compiler version string, NUL-padded (for example `1.95.0`) |
@@ -1203,7 +1224,12 @@ engine's `CURRENT_DT` moved into compiled programs); version 4 since `Cx` carrie
 a debug image (§13.2, 24 October 2026); version 3 added the call depth of §6.4 (the owner, 23 October
 2026);
 version 2 added `read_real` (version 1 had two functions; the owner approved version 2 on 23 October
-2026). A module records a fault in `Cx::fault` (its code, the statement and up to three numbers: the
+2026). Version 6 (10 November 2026; specification 34 D.6) adds the AVR's flash-read functions to
+`KernelApi`: an AVR data load cannot address flash, so on `avr-none` the generated code and the
+libraries read the module's `RODATA`, constants and string literals through them, and the kernel
+reads the image's table sections through them (§5.1); on every other target the module reads its own
+data directly and these functions are never called. On AVR the pointers in `Cx`, `Area` and `Frame`
+are 16-bit. A module records a fault in `Cx::fault` (its code, the statement and up to three numbers: the
 index and the bounds, the value and the bounds) and returns its code; no kernel function is called
 for it. A statement looks at its breakpoint bit only while `armed` is set, so a statement costs a
 store of its id, a decrement of the budget and two branches when no debugger is armed.
@@ -2095,6 +2121,7 @@ finds no depth left, §6.4) is reported as the runtime error `CallDepthExceeded`
 | 0.43 | 7 November 2026 | A DUT's `EXTENDS` copies compiled (specification 02 §3.5.1), which the type checker accepts, in the places the build refused with "an assignment between different types" (NX-09): a derived value as a function's, a method's or a function block's input of its base's type, an assignment to a variable of the base's type, into a `STRUCT OVERLAP`'s member included, and a call whose result extends the base's type (§6.6). The copy assigns the base's fields from the front of the derived value, its own fields no part of it. |
 | 0.44 | 8 November 2026 | A declaration's initial value converts by the program's conversion rules (specification 07 §2.10), which the type checker accepts under the CODESYS profile: `bXMax : BYTE := ANY_TO_BYTE(255)` compiles, and `ANY_TO_BYTE(300)` keeps the low-order bits of the target's width, 44, where the IEC rules overflow (§6.7). The build refused every such conversion with "in a declaration ... is not compiled yet" (NX-09); a conversion outside an initial value (a bound, the program configuration) is still refused. |
 | 0.45 | 10 November 2026 | An `FB_init` input of a type that is no scalar compiled (§6.7; contributor issue #419): a string, a structure or an array takes the instance declaration's argument, else its default, and the cold-init and warm-init entries pass it by reference to a value of its type, made as a call makes an omitted input's value. A bare instance of a block whose `FB_init` declares a `STRING` input, `fbLogger : FbLogger;`, builds, and the input takes its default; `fbLogger : FbLogger(sLoggerName := 'Light')` passes the text. CODESYS's help on methods lets a call leave an input out, and reinitializes a method's variables at each call. The build refused every such input, passed or not, with "of a type that is no scalar ... not compiled yet". An argument that names a variable stays refused (NX-09). The image format is unchanged. |
+| 0.46 | 10 November 2026 | The AVR family's module target (owner, 10 November 2026; specification 34 D.6, H.2). §4.4: `avr-none`, target id 5, `extern "C"` with 16-bit pointers, built by the bundle's pinned nightly — the one target that needs one — with its `CODE` executing from the slot's flash and its data read through the kernel's flash-read functions, since an AVR data load cannot reach flash. §4.5: every other target still builds on the pinned stable rustc with no `-Z` flag; the image header's compiler version names the nightly for AVR modules. §4.6: the bundle carries `core` and `compiler_builtins` for `avr-none` from the nightly's `-Z build-std` build, marked `"nightly": true` in the manifest. §5.1, §8.2: the image's tables are read byte by byte with `LPM` on AVR; the kernel interface goes to version 6 with the flash-read functions in `KernelApi`, never called on the other targets. §5.2: target id 5 is `avr`. The image format is otherwise unchanged. |
 | 0.42 | 6 November 2026 | A recursive call that finds no depth left is reported as the runtime error `CallDepthExceeded`, `call depth exceeded`, with its stable code `vm_call_stack_overflow` (§6.4, Appendix A). Before, the kernel reported it through the bytecode engine's fault type, which the deletion of the engine (0.22) had left with this one fault and a text for the others, `invalid bytecode '<detail>'`, that nothing produced any more. The error's text and stable code are unchanged (checklist G61). |
 | 0.41 | 6 November 2026 | Round 2 of the CODESYS vendor conversions of specification 07 §2.10 (`docs/IEC_DEVIATIONS.md` DEV-045), which the type checker accepts under the CODESYS rules, compiled (§6.8): an integer (its low-order 32 bits) and a real to a `TIME` as a count of milliseconds, a `DWORD` to a time of day, and a text to an integer or a bit string by the vendor's parse. The build refused the first three, and parsed a text by the IEC rules. And a `TIME` or an `LTIME` as text, the vendor's text measured on a PFC200 (`T#1s500ms`), which the build refused (NX-09). |
 | 0.40 | 6 November 2026 | The CODESYS vendor conversions of specification 07 §2.4 and §2.7 (`docs/IEC_DEVIATIONS.md` DEV-036), which the type checker accepted under the CODESYS rules since 31 October 2026, compiled (§6.8): a duration to an integer, a time of day to a `DWORD`, a `BOOL` and an enumerated value as text. The build refused the first three, and spelled an enumerated value as its number. `TO_STRING` of a duration stays refused (NX-09) until the vendor's text is measured. |
