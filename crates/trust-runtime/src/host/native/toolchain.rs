@@ -77,6 +77,10 @@ pub struct Toolchain {
     pub avr_rustc: Option<PathBuf>,
     /// The nightly's version, for the image header of an AVR module (specification 44 §4.5).
     pub avr_version: Option<String>,
+    /// The nightly's linker, `bin/rust-lld-nightly` of the folder, which links the AVR module with
+    /// the same LLVM that compiled it. `None` in a folder that holds none, where the release's
+    /// `rust-lld` links it.
+    pub avr_linker: Option<PathBuf>,
 }
 
 /// Where the tools found their toolchain (specification 44 §4.6).
@@ -167,6 +171,10 @@ impl Toolchain {
         } else {
             (None, None)
         };
+        let avr_linker = root
+            .join("bin")
+            .join(format!("rust-lld-nightly{suffix}"))
+            .filter(|path| path.is_file());
         Ok(Self {
             rustc,
             linker,
@@ -175,6 +183,7 @@ impl Toolchain {
             root: root.to_path_buf(),
             avr_rustc,
             avr_version,
+            avr_linker,
         })
     }
 
@@ -289,6 +298,11 @@ impl Toolchain {
         if target == Target::Avr {
             command.arg("--sysroot").arg(&self.root);
         }
+        let linker = if target == Target::Avr {
+            self.avr_linker.as_ref().unwrap_or(&self.linker)
+        } else {
+            &self.linker
+        };
         command
             .args([
                 "--edition",
@@ -325,7 +339,7 @@ impl Toolchain {
             .arg(format!("--remap-path-prefix={}=.", work.display()))
             .args(["--cfg", "trust_module"])
             .arg("-C")
-            .arg(format!("linker={}", self.linker.display()))
+            .arg(format!("linker={}", linker.display()))
             .args(["-C", "linker-flavor=ld.lld"])
             .arg("-C")
             .arg(format!("link-arg=-T{}", script.display()))
@@ -404,6 +418,7 @@ mod tests {
             root: ".".into(),
             avr_rustc: Some("bin/rustc-nightly".into()),
             avr_version: Some("1.102.0-nightly".to_string()),
+            avr_linker: Some("bin/rust-lld-nightly".into()),
         };
         assert_eq!(toolchain.version_for(Target::Avr), "1.102.0-nightly");
         assert_eq!(toolchain.version_for(Target::X86_64), "1.99.0");

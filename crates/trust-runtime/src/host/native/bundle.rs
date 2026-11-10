@@ -17,8 +17,10 @@ mod pack;
 pub use install::{install, install_from, Installer, Progress};
 pub use pack::write_bundle;
 
-/// The format of `manifest.json` this release writes and reads.
-pub const MANIFEST_FORMAT: u32 = 1;
+/// The format of `manifest.json` this release writes and reads. 2 since the AVR port: a target's
+/// entry names the compiler that builds it and whether that is the bundle's pinned nightly
+/// (specification 44 §4.6).
+pub const MANIFEST_FORMAT: u32 = 2;
 
 /// The manifest's file at the bundle's root.
 pub const MANIFEST_FILE: &str = "manifest.json";
@@ -29,11 +31,12 @@ pub const RELEASES: &str =
 
 /// The module targets of §4.4, for each of which a bundle carries the compiler's `core` and the
 /// program library.
-pub const MODULE_TARGETS: [Target; 4] = [
+pub const MODULE_TARGETS: [Target; 5] = [
     Target::Rv32imac,
     Target::ThumbV8mMainHf,
     Target::X86_64,
     Target::Aarch64,
+    Target::Avr,
 ];
 
 /// The truST version whose bundle these tools use, the kernel's.
@@ -53,10 +56,26 @@ pub struct Manifest {
     pub rustc: String,
     /// The program library, `trust-plc-lib <version>`.
     pub program_library: String,
-    /// The module targets the bundle builds for.
-    pub targets: Vec<String>,
+    /// The module targets the bundle builds for, each naming the compiler that builds it.
+    pub targets: Vec<ManifestTarget>,
     /// Every other file of the bundle.
     pub files: Vec<ManifestFile>,
+}
+
+/// One module target of a bundle's manifest (§4.6).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ManifestTarget {
+    /// The Rust target triple.
+    pub name: String,
+    /// The version of the compiler that builds modules for the target: the pinned release's, or
+    /// the pinned nightly's for `avr-none`.
+    pub rustc: String,
+    /// Whether the target builds with the bundle's pinned nightly, `bin/rustc-nightly`, whose
+    /// `core` and `compiler_builtins` for the triple the bundle carries in
+    /// `lib/rustlib/<triple>/lib/` (specification 44 §4.5): `avr-none` is a tier-3 target no stable
+    /// release ships a standard library for.
+    pub nightly: bool,
 }
 
 /// One file of a bundle.

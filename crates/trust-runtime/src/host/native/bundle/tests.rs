@@ -46,7 +46,11 @@ fn manifest(sources: &Path, version: &str, platform: &str) -> Manifest {
         platform: platform.to_string(),
         rustc: String::from("1.99.0"),
         program_library: String::from("trust-plc-lib 9.9.9"),
-        targets: vec![String::from("riscv32imac-unknown-none-elf")],
+        targets: vec![ManifestTarget {
+            name: String::from("riscv32imac-unknown-none-elf"),
+            rustc: String::from("1.99.0"),
+            nightly: false,
+        }],
         files: FILES
             .iter()
             .map(|(path, _)| {

@@ -19,6 +19,10 @@
 #![cfg_attr(not(feature = "host"), no_std)]
 #![warn(missing_docs)]
 
+#[cfg(target_arch = "avr")]
+mod avr;
+#[cfg(target_arch = "avr")]
+pub use avr::avr_mulsi3;
 mod fault;
 pub mod kernel;
 pub mod module;

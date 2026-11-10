@@ -10,13 +10,39 @@ use flate2::write::GzEncoder;
 use flate2::Compression;
 
 use super::{
-    file_sha256, platform, relative, Manifest, ManifestFile, MANIFEST_FILE, MANIFEST_FORMAT,
-    MODULE_TARGETS, TRUST_VERSION,
+    file_sha256, platform, relative, Manifest, ManifestFile, ManifestTarget, MANIFEST_FILE,
+    MANIFEST_FORMAT, MODULE_TARGETS, TRUST_VERSION,
 };
 use crate::native::{triple, NativeError};
+use trust_runtime_core::native::image::Target;
 
 /// The parts of `rust-std` a freestanding module links, by the start of their file names.
 const STD_PARTS: [&str; 2] = ["libcore-", "libcompiler_builtins-"];
+
+/// The manifest's module targets (§4.6): each target with the version of the compiler that builds
+/// it — the pinned release's, or `nightly_release`'s for `avr-none`, which builds with the
+/// bundle's pinned nightly (`nightly: true`).
+fn manifest_targets(release: &str, nightly_release: Option<&str>) -> Vec<ManifestTarget> {
+    MODULE_TARGETS
+        .iter()
+        .map(|target| {
+            let name = triple(*target).to_string();
+            if *target == Target::Avr {
+                ManifestTarget {
+                    name,
+                    rustc: nightly_release.unwrap_or_default().to_string(),
+                    nightly: true,
+                }
+            } else {
+                ManifestTarget {
+                    name,
+                    rustc: release.to_string(),
+                    nightly: false,
+                }
+            }
+        })
+        .collect()
+}
 
 /// Writes the bundle of this computer's platform into `archive` from the development toolchain
 /// folder `folder` (`scripts/native/build_toolchain_libraries.sh` with every module target), and
@@ -65,16 +91,68 @@ pub fn write_bundle(folder: &Path, archive: &Path) -> Result<Manifest, NativeErr
         ),
     ];
     parts.extend(compiler_libraries(&sysroot)?);
+    // The pinned nightly of the avr-none module target (specification 44 §4.5, §4.6): the folder's
+    // `bin/rustc-nightly`, the linker beside it, and the libraries that compiler loads, resolved
+    // through the links so the archive holds the real files.
+    let nightly = MODULE_TARGETS
+        .contains(&Target::Avr)
+        .then(|| folder.join("bin").join(executable("rustc-nightly")))
+        .filter(|path| path.is_file());
+    let nightly_release = match &nightly {
+        Some(rustc) => {
+            let description = ask(rustc, &["-vV"])?;
+            let release = description
+                .lines()
+                .find_map(|line| line.strip_prefix("release:"))
+                .map(|value| value.trim().to_string())
+                .ok_or_else(|| {
+                    NativeError::Toolchain(format!("{} names no release", rustc.display()))
+                })?;
+            let sysroot = PathBuf::from(ask(rustc, &["--print", "sysroot"])?.trim());
+            parts.push((
+                format!("bin/{}", executable("rustc-nightly")),
+                std::fs::canonicalize(rustc)
+                    .map_err(|error| NativeError::Toolchain(format!("{}: {error}", rustc.display())))?,
+            ));
+            let lld = folder.join("bin").join(executable("rust-lld-nightly"));
+            if lld.is_file() {
+                parts.push((
+                    format!("bin/{}", executable("rust-lld-nightly")),
+                    std::fs::canonicalize(&lld)
+                        .map_err(|error| NativeError::Toolchain(format!("{}: {error}", lld.display())))?,
+                ));
+            }
+            parts.extend(compiler_libraries(&sysroot)?);
+            Some(release)
+        }
+        None => None,
+    };
+    if MODULE_TARGETS.contains(&Target::Avr) && nightly_release.is_none() {
+        return Err(NativeError::Toolchain(format!(
+            "{} has no bin/rustc-nightly for the avr-none module target: build the toolchain's \
+             libraries with scripts/native/build_toolchain_libraries.sh, which links the pinned \
+             nightly (specification 44 §4.6)",
+            folder.join("bin").display()
+        )));
+    }
     let mut program_library: Option<String> = None;
     for target in MODULE_TARGETS {
         let triple = triple(target);
-        let std_folder = sysroot.join("lib/rustlib").join(triple).join("lib");
+        // The avr-none standard library is tier 3, which rustup ships for no release: the
+        // development folder carries the nightly's build of it, not the compiler's own folder.
+        let std_folder = if target == Target::Avr {
+            folder.join("lib/rustlib").join(triple).join("lib")
+        } else {
+            sysroot.join("lib/rustlib").join(triple).join("lib")
+        };
         let std_parts = files_in(&std_folder, |name| {
             STD_PARTS.iter().any(|part| name.starts_with(part))
         })?;
         if std_parts.len() < STD_PARTS.len() {
             return Err(NativeError::Toolchain(format!(
-                "{} lacks the core of {triple}: rustup target add {triple}",
+                "{} lacks the core of {triple}: build it with \
+                 scripts/native/build_toolchain_libraries.sh (rustup target add {triple} for the \
+                 others)",
                 std_folder.display()
             )));
         }
@@ -120,10 +198,7 @@ pub fn write_bundle(folder: &Path, archive: &Path) -> Result<Manifest, NativeErr
         platform: platform.to_string(),
         rustc: release,
         program_library: program_library.unwrap_or_default(),
-        targets: MODULE_TARGETS
-            .iter()
-            .map(|target| triple(*target).to_string())
-            .collect(),
+        targets: manifest_targets(&release, nightly_release.as_deref()),
         files,
     };
     pack(&manifest, &parts, archive)?;
@@ -255,4 +330,31 @@ fn files_in(
     }
     found.sort();
     Ok(found)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Specification 44 §4.6: the manifest's entry for `avr-none` marks `nightly: true` and names
+    /// the pinned nightly's version, and every other target's entry names the pinned stable
+    /// release. Catches an AVR entry that names the stable rustc (its module would be compiled by
+    /// a compiler its libraries were not built with) and a nightly flag set on another target.
+    #[test]
+    fn the_avr_target_is_marked_nightly_with_the_nightly_version() {
+        let targets = manifest_targets("1.99.0", Some("1.102.0-nightly"));
+        assert_eq!(targets.len(), MODULE_TARGETS.len());
+        let avr = targets
+            .iter()
+            .find(|target| target.name == "avr-none")
+            .expect("the avr-none target");
+        assert_eq!(avr.rustc, "1.102.0-nightly");
+        assert!(avr.nightly);
+        for target in &targets {
+            if target.name != "avr-none" {
+                assert_eq!(target.rustc, "1.99.0", "{}", target.name);
+                assert!(!target.nightly, "{}", target.name);
+            }
+        }
+    }
 }
