@@ -7,6 +7,41 @@ it does not create additional product requirements. Existing closed extraction b
 
 ## Current checkpoint
 
+**10 November 2026 (lead): AVR port phase 0 done, phase 1 spike green on the local Pi** (specification
+34 v0.74 and specification 44 v0.46, branch `work/avr-port-spec-phase0`, owner decisions of
+10 November 2026 recorded in both histories). Spike results, all on rustc `1.102.0-nightly
+(ac8310ba6 2026-11-09)` with `rust-src`, target `avr-none`, `-C target-cpu=atmega328p`,
+`-Z build-std=core,compiler_builtins -Z build-std-features=compiler-builtins-mem`:
+
+- `avr-none` builds with the pinned nightly only; `-C target-cpu` is required (no default CPU).
+- Soft float: `f32`/`f64` arithmetic lowers to `__adddf3`, `__muldf3`, `__divsf3`, `__extendsfdf2`,
+  `__fixunsdfsi`, `__gedf2` etc., all provided by `compiler_builtins` (weak symbols present), so
+  `REAL` and `LREAL` both link; correctness is compiler-rt's, to be proven on hardware.
+- Harvard gap confirmed: `static` rodata is emitted to `@progbits` (flash) but read with data-space
+  `ld`/`ldd`, not `lpm` — plain rodata reads would read RAM on hardware. Flash reads work via
+  inline `asm!("lpm {0}, Z+", …)` (needs `#![feature(asm_experimental_arch)]`, nightly-only, fine)
+  with Z in r30/r31; `lpm` has no `Z+n` form, only `Z` and `Z+`. So specification 44 §8.2's
+  version-6 flash-read functions are required, exactly as spec 44 v0.46 says; the generated module's
+  constants/strings must go through them (or a progmem-style section read by them).
+- `__mulsi3` gap: LLVM's AVR backend lowers i32 mul to a call of `__mulsi3`, which compiler-builtins
+  does not provide for avr (only riscv/m68k get the Rust impl; div/mod variants are provided).
+  u8 and u16 muls expand inline (`mul`/`muls`), so a pure-Rust `__mulsi3` from 16x16 partial
+  products of 8x8 muls works (spike crate links with it); it belongs in the AVR adapter, host-testable.
+- Full link with `rust-lld -flavor gnu` and a MEMORY/SECTIONS script for the 328P: zero undefined
+  symbols (with our `__mulsi3`; `__do_copy_data` is the startup's, provided by our firmware), text
+  13,520 bytes for core + compiler_builtins + a small module using f32/f64 math with
+  `--gc-sections`. So a float-using module floor is ~13.5 KiB of the 328P's 32 KiB; the kernel and the
+  program slot come on top — the 328P's limits are real, as spec 34 D.6 says.
+- `avr-device` 0.7 (feature `atmega328p`) and `critical-section` 1.2 with a custom impl
+  (`set_impl!`, `restore-state-u8`, `acquire` = `in` SREG (I/O 0x3F) + `cli`, `release` = `sei` if
+  the I bit was set) both build for `avr-none`: the no-CAS critical-section route works.
+- crates.io and static.rust-lang.org reachable from the Pi; the `trust-builder` ssh alias does not
+  resolve from this sandbox, so the spike ran locally (small build-std, fine on the Pi).
+
+Risks 1-3 of the AVR plan (Harvard reads, soft float, nightly divergence) are downgraded: the design
+in the specs covers them and each has a working mechanism. Next: Phase 2, `Target::Avr` in
+`trust-runtime-core` and the generator, then the `trust-platform-avr` adapter.
+
 **6 November 2026 (lead): specification 34 v0.73, from the Rust-logic checklist's G5.** The bytecode
 engine's built-in import contracts are gone. A compiled image imports nothing (specification 44 §6.9), so
 `trust-runtime-core::stdlib::contracts`, its test `import_contracts.rs`, the admission's contract check,
