@@ -17,6 +17,7 @@ pub fn triple(target: Target) -> &'static str {
         Target::ThumbV8mMainHf => "thumbv8m.main-none-eabihf",
         Target::X86_64 => "x86_64-unknown-linux-gnu",
         Target::Aarch64 => "aarch64-unknown-linux-gnu",
+        Target::Avr => "avr-none",
     }
 }
 

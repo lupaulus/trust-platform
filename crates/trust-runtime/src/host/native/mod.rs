@@ -148,6 +148,7 @@ pub fn target_named(name: &str) -> Option<Target> {
         "aarch64" | "arm64" | "aarch64-unknown-linux-gnu" | "aarch64-apple-darwin" => {
             Some(Target::Aarch64)
         }
+        "atmega328p" | "atmega2560" | "avr" | "avr-none" => Some(Target::Avr),
         _ => None,
     }
 }
@@ -392,7 +393,7 @@ pub fn build_with_conversions(
         options.target,
         u16::try_from(trust_plc_abi::INTERFACE_VERSION).unwrap_or(u16::MAX),
     );
-    writer.rustc.clone_from(&toolchain.version);
+    writer.rustc = toolchain.version_for(options.target).to_owned();
     // The program library the module links and the sources it was built from (§5.2).
     writer.library = trust_runtime_core::native::library::library_hash(
         &toolchain.program_library(options.target)?,
@@ -449,4 +450,21 @@ pub fn build_with_conversions(
             .as_ref()
             .and_then(|configuration| configuration.resource_name.clone()),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Specification 44 §4.4: the AVR names a device (`atmega328p`, `atmega2560`), the family
+    /// (`avr`) and the Rust triple (`avr-none`) all name target 5. Catches a name that falls through
+    /// to `None` (`trust-runtime build --target atmega328p` would refuse a supported chip) and one
+    /// that names another target.
+    #[test]
+    fn the_avr_names_target_avr() {
+        for name in ["atmega328p", "atmega2560", "avr", "avr-none", "AVR-NONE"] {
+            assert_eq!(target_named(name), Some(Target::Avr), "{name}");
+        }
+        assert_eq!(target_named("atmega2564"), None);
+    }
 }

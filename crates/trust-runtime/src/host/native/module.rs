@@ -38,6 +38,7 @@ pub(super) fn extract(
         Target::ThumbV8mMainHf => object::Architecture::Arm,
         Target::X86_64 => object::Architecture::X86_64,
         Target::Aarch64 => object::Architecture::Aarch64,
+        Target::Avr => object::Architecture::Avr,
     };
     if file.architecture() != architecture {
         return Err(refuse(format!(

@@ -22,6 +22,16 @@ fn the_library_hash_names_the_library_and_its_target() {
             0x79, 0x02
         ]
     );
+    // Specification 44 §4.4: the AVR's triple is `avr-none`, and its library hash names it, so an
+    // AVR image does not admit another CPU's library. Worked with Python's hashlib as above.
+    assert_eq!(triple(Target::Avr), "avr-none");
+    assert_eq!(
+        library_hash("trust-plc-lib 1.2.3", Target::Avr),
+        [
+            0xcd, 0x67, 0xf6, 0x03, 0x13, 0x4b, 0xfb, 0x3e, 0x3b, 0x49, 0xeb, 0x6a, 0x21, 0x03,
+            0x87, 0xaa
+        ]
+    );
     assert_eq!(
         PROGRAM_LIBRARY,
         concat!("trust-plc-lib ", env!("CARGO_PKG_VERSION"))

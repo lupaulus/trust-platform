@@ -21,13 +21,16 @@ pub fn triple(target: Target) -> &'static str {
 }
 
 /// The CPU and features of a module for `target`, fixed so that every device computes the same
-/// bits (specification 44 §9).
+/// bits (specification 44 §9). The AVR module builds for the avr5 baseline, which every AVR of the
+/// family runs (specification 34 D.6); `avr-none` requires an explicit `-C target-cpu` (the spike
+/// of 10 November 2026), so the AVR names its chip, not a family default.
 fn cpu(target: Target) -> (&'static str, &'static str) {
     match target {
         Target::Rv32imac => ("generic-rv32", "+m,+a,+c"),
         Target::ThumbV8mMainHf => ("cortex-m33", "+fp-armv8d16sp"),
         Target::X86_64 => ("x86-64", "+sse2"),
         Target::Aarch64 => ("generic", "+reserve-x18"),
+        Target::Avr => ("atmega328p", ""),
     }
 }
 
@@ -63,6 +66,17 @@ pub struct Toolchain {
     pub libraries: PathBuf,
     /// The compiler's version, for the image header.
     pub version: String,
+    /// The toolchain's root folder, a sysroot for the targets rustup ships no standard library
+    /// for: its `lib/rustlib/<triple>/lib/` holds the `core` and `compiler_builtins` the
+    /// `avr-none` module links (specification 44 §4.6).
+    pub root: PathBuf,
+    /// The pinned nightly compiler of the `avr-none` module target, `bin/rustc-nightly` of the
+    /// folder (specification 44 §4.5, §4.6): `avr-none` is a tier-3 target, and the libraries are
+    /// built with the same nightly, so the module must be compiled with it too. `None` in a
+    /// folder that holds none.
+    pub avr_rustc: Option<PathBuf>,
+    /// The nightly's version, for the image header of an AVR module (specification 44 §4.5).
+    pub avr_version: Option<String>,
 }
 
 /// Where the tools found their toolchain (specification 44 §4.6).
@@ -134,12 +148,46 @@ impl Toolchain {
             .nth(1)
             .unwrap_or_default()
             .to_string();
+        // The pinned nightly of the avr-none module target (specification 44 §4.5, §4.6), when
+        // the folder carries one.
+        let avr_rustc = root.join("bin").join(format!("rustc-nightly{suffix}"));
+        let (avr_rustc, avr_version) = if avr_rustc.is_file() {
+            let output = Command::new(&avr_rustc)
+                .arg("--version")
+                .output()
+                .map_err(|error| {
+                    NativeError::Toolchain(format!("{}: {error}", avr_rustc.display()))
+                })?;
+            let version = String::from_utf8_lossy(&output.stdout)
+                .split_whitespace()
+                .nth(1)
+                .unwrap_or_default()
+                .to_string();
+            (Some(avr_rustc), Some(version))
+        } else {
+            (None, None)
+        };
         Ok(Self {
             rustc,
             linker,
             libraries: root.join("lib"),
             version,
+            root: root.to_path_buf(),
+            avr_rustc,
+            avr_version,
         })
+    }
+
+    /// The compiler version an image built for `target` carries in its header (specification 44
+    /// §5.2): the pinned release's, or the pinned nightly's for the `avr-none` module target,
+    /// whose libraries that nightly built (§4.5).
+    #[must_use]
+    pub fn version_for(&self, target: Target) -> &str {
+        if target == Target::Avr {
+            self.avr_version.as_deref().unwrap_or(&self.version)
+        } else {
+            &self.version
+        }
     }
 
     /// The program library the toolchain holds for `target`, `trust-plc-lib <version>`, as its
@@ -222,7 +270,25 @@ impl Toolchain {
             None
         };
         let (cpu, features) = cpu(target);
-        let mut command = Command::new(&self.rustc);
+        // The avr-none module target compiles with the toolchain's pinned nightly, whose build of
+        // `core` and `compiler_builtins` the folder carries in `lib/rustlib/avr-none/lib/`
+        // (specification 44 §4.5, §4.6); the nightly finds them through `--sysroot` of the folder.
+        let rustc = if target == Target::Avr {
+            self.avr_rustc.as_ref().ok_or_else(|| {
+                NativeError::Toolchain(format!(
+                    "{} has no bin/rustc-nightly for the avr-none module target: build the \
+                     toolchain's libraries with scripts/native/build_toolchain_libraries.sh, \
+                     which links the pinned nightly (specification 44 §4.6)",
+                    self.root.display()
+                ))
+            })?
+        } else {
+            &self.rustc
+        };
+        let mut command = Command::new(rustc);
+        if target == Target::Avr {
+            command.arg("--sysroot").arg(&self.root);
+        }
         command
             .args([
                 "--edition",
@@ -248,9 +314,11 @@ impl Toolchain {
             // that a module may not have (specification 44 §4.5), without it directly.
             .args(["-C", "relro-level=off"])
             .arg("-C")
-            .arg(format!("target-cpu={cpu}"))
-            .arg("-C")
-            .arg(format!("target-feature={features}"))
+            .arg(format!("target-cpu={cpu}"));
+        if !features.is_empty() {
+            command.arg("-C").arg(format!("target-feature={features}"));
+        }
+        command
             .args(["-C", "remark=prolog-epilog"])
             // Each build has a folder of its own, whose path reaches no module, so that the same
             // project builds the same bytes (NX-07).
@@ -283,9 +351,9 @@ impl Toolchain {
                 .arg(format!("link-arg=--undefined={entry}"));
         }
         command.arg(&crate_file).arg("-o").arg(&output);
-        let result = command.output().map_err(|error| {
-            NativeError::Toolchain(format!("{}: {error}", self.rustc.display()))
-        })?;
+        let result = command
+            .output()
+            .map_err(|error| NativeError::Toolchain(format!("{}: {error}", rustc.display())))?;
         let diagnostics = String::from_utf8_lossy(&result.stderr).to_string();
         if !result.status.success() {
             let errors: String = diagnostics
@@ -319,6 +387,27 @@ pub fn stack_frames(diagnostics: &str) -> Vec<(String, u64)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Specification 34 D.6 and 44 §4.4, §4.5: the AVR module builds for the avr5 baseline
+    /// `atmega328p` (`avr-none` requires an explicit `-C target-cpu`) with no extra features, and
+    /// its image header carries the pinned nightly's version, the compiler that built its
+    /// libraries. Catches an AVR cpu of another chip, an empty-features flag passed to rustc, and a
+    /// header naming the stable release for an AVR module.
+    #[test]
+    fn the_avr_target_uses_the_avr5_cpu_and_the_nightly_version() {
+        assert_eq!(cpu(Target::Avr), ("atmega328p", ""));
+        let toolchain = Toolchain {
+            rustc: "bin/rustc".into(),
+            linker: "bin/rust-lld".into(),
+            libraries: "lib".into(),
+            version: "1.99.0".to_string(),
+            root: ".".into(),
+            avr_rustc: Some("bin/rustc-nightly".into()),
+            avr_version: Some("1.102.0-nightly".to_string()),
+        };
+        assert_eq!(toolchain.version_for(Target::Avr), "1.102.0-nightly");
+        assert_eq!(toolchain.version_for(Target::X86_64), "1.99.0");
+    }
 
     /// The compiler's remark gives each function's frame, which the stack bound adds.
     #[test]

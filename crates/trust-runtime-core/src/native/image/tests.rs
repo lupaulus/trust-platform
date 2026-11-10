@@ -593,3 +593,16 @@ fn a_globals_owner_is_its_byte_15() {
         assert_eq!(SymbolRecord::read(&bytes), symbol);
     }
 }
+
+/// Specification 44 §5.2: target id 5 is `avr` (`avr-none`), and §8.2: the AVR's pointers are
+/// 16-bit, so a reference takes 2 bytes. Catches an id shifted onto another target (an AVR image
+/// read as rv32imac or a riscv image run on an AVR) and a pointer size of 4, which would lay a
+/// reference out two bytes too wide in every area.
+#[test]
+fn the_avr_target_is_id_5_with_16_bit_pointers() {
+    assert_eq!(Target::from_raw(5), Some(Target::Avr));
+    assert_eq!(Target::from_raw(6), None);
+    assert_eq!(Target::Avr.pointer_bytes(), 2);
+    assert!(!Target::Avr.is_computer());
+    assert!(!Target::Avr.thumb());
+}

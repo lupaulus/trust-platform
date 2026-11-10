@@ -176,6 +176,9 @@ pub enum Target {
     X86_64 = 3,
     /// AArch64, every 64-bit ARM computer.
     Aarch64 = 4,
+    /// AVR 8-bit, the ATmega328P and the ATmega2560 (specification 34 D.6); modules build for the
+    /// avr5 baseline (`-C target-cpu=atmega328p`), which every AVR in the family runs.
+    Avr = 5,
 }
 
 impl Target {
@@ -187,6 +190,7 @@ impl Target {
             Self::ThumbV8mMainHf,
             Self::X86_64,
             Self::Aarch64,
+            Self::Avr,
         ]
         .into_iter()
         .find(|target| *target as u32 == raw)
@@ -203,6 +207,8 @@ impl Target {
             Some(Self::X86_64)
         } else if cfg!(target_arch = "aarch64") {
             Some(Self::Aarch64)
+        } else if cfg!(target_arch = "avr") {
+            Some(Self::Avr)
         } else {
             None
         }
@@ -223,11 +229,14 @@ impl Target {
     }
 
     /// The bytes of an address on the target, which a reference or a pointer of a program built
-    /// for it takes (specification 29 §1): 4 on the 32-bit chips, 8 on a 64-bit computer.
+    /// for it takes (specification 29 §1): 2 on the AVR (16-bit pointers, specification 44 §8.2),
+    /// 4 on the 32-bit chips, 8 on a 64-bit computer.
     #[must_use]
     pub fn pointer_bytes(self) -> u64 {
         if self.is_computer() {
             8
+        } else if self == Self::Avr {
+            2
         } else {
             4
         }

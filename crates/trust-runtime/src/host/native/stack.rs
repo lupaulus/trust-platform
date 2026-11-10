@@ -20,20 +20,23 @@ const KERNEL_FUNCTIONS: u64 = 4096;
 /// builtins, which the module links outside its link-time optimization.
 const UNKNOWN_FRAME: u64 = 512;
 
-/// The call relocations of each target, and the distance from a relocation's place to the
+/// The call relocations of each target, each with the distance from the relocation's place to the
 /// called address that its addend leaves out: an x86-64 call's displacement counts from the end
-/// of its four bytes.
-fn calls(target: Target) -> (&'static [u32], i64) {
+/// of its four bytes; an AVR `rcall`'s from the end of its two and a `call`'s from the end of its
+/// four.
+fn calls(target: Target) -> &'static [(u32, i64)] {
     match target {
         // R_X86_64_PC32, R_X86_64_PLT32, R_X86_64_GOTPCREL (a call through the table the image
         // builder relaxes).
-        Target::X86_64 => (&[2, 4, 9], 4),
+        Target::X86_64 => &[(2, 4), (4, 4), (9, 4)],
         // R_RISCV_JAL, R_RISCV_CALL, R_RISCV_CALL_PLT.
-        Target::Rv32imac => (&[17, 18, 19], 0),
+        Target::Rv32imac => &[(17, 0), (18, 0), (19, 0)],
         // R_ARM_THM_CALL, R_ARM_THM_JUMP24.
-        Target::ThumbV8mMainHf => (&[10, 30], 0),
+        Target::ThumbV8mMainHf => &[(10, 0), (30, 0)],
         // R_AARCH64_JUMP26, R_AARCH64_CALL26.
-        Target::Aarch64 => (&[282, 283], 0),
+        Target::Aarch64 => &[(282, 0), (283, 0)],
+        // R_AVR_13_PCREL (rcall, two bytes), R_AVR_CALL (call, four bytes).
+        Target::Avr => &[(3, 2), (18, 4)],
     }
 }
 
@@ -92,15 +95,15 @@ pub(super) fn bound(
             .checked_sub(1)
             .filter(|index| address < functions[*index].1)
     };
-    let (kinds, displacement) = calls(target);
+    let kinds = calls(target);
     let mut callees: Vec<Vec<usize>> = vec![Vec::new(); functions.len()];
     for (offset, relocation) in text.relocations() {
         let RelocationFlags::Elf { r_type } = relocation.flags() else {
             continue;
         };
-        if !kinds.contains(&r_type) {
+        let Some(&(_, displacement)) = kinds.iter().find(|(kind, _)| *kind == r_type) else {
             continue;
-        }
+        };
         let Some(caller) = containing(offset) else {
             continue;
         };
